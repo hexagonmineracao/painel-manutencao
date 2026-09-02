@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { exportToCsv } from '../lib/csv'
 import type { FuelDelivery, FuelRecord, Machine, MaintenanceRecord } from '../lib/database.types'
 
 function daysAgoInput(days: number) {
@@ -129,6 +130,41 @@ export function Reports() {
   const avgPricePerLiter = totalDeliveredLiters > 0 ? totalDeliveredCost / totalDeliveredLiters : null
   const balance = totalDeliveredLiters - totalLiters
 
+  function exportDeliveries() {
+    exportToCsv(
+      `entradas_combustivel_${from}_a_${to}`,
+      ['Data', 'Litros', 'Valor', 'R$/L', 'Fornecedor'],
+      deliveries.map((d) => [
+        new Date(d.delivered_at).toLocaleDateString('pt-BR'),
+        Number(d.liters).toFixed(1),
+        Number(d.total_cost).toFixed(2),
+        (Number(d.total_cost) / Number(d.liters)).toFixed(3),
+        d.supplier ?? '',
+      ]),
+    )
+  }
+
+  function exportFuelByMachine() {
+    exportToCsv(
+      `combustivel_por_maquina_${from}_a_${to}`,
+      ['Máquina', 'Litros', 'Custo', 'L/h'],
+      fuelRows.map((r) => [
+        r.machine.name,
+        r.liters.toFixed(1),
+        r.cost.toFixed(2),
+        r.litersPerHour != null ? r.litersPerHour.toFixed(2) : '',
+      ]),
+    )
+  }
+
+  function exportMaintenanceByMachine() {
+    exportToCsv(
+      `manutencoes_por_maquina_${from}_a_${to}`,
+      ['Máquina', 'Quantidade', 'Custo'],
+      maintenanceRows.map((r) => [r.machine.name, r.count, r.cost.toFixed(2)]),
+    )
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-slate-900">Relatórios</h1>
@@ -159,12 +195,17 @@ export function Reports() {
       ) : (
         <>
           <section className="bg-white border border-slate-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between gap-3">
               <span>Entrada de combustível (tanque principal)</span>
-              <span className="text-sm text-slate-500 font-normal">
-                Total: {totalDeliveredLiters.toFixed(0)} L · R$ {totalDeliveredCost.toFixed(2)}
-                {avgPricePerLiter != null && ` · média R$ ${avgPricePerLiter.toFixed(3)}/L`}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500 font-normal">
+                  Total: {totalDeliveredLiters.toFixed(0)} L · R$ {totalDeliveredCost.toFixed(2)}
+                  {avgPricePerLiter != null && ` · média R$ ${avgPricePerLiter.toFixed(3)}/L`}
+                </span>
+                <button onClick={exportDeliveries} className="text-xs text-slate-500 underline hover:text-slate-900">
+                  Exportar CSV
+                </button>
+              </div>
             </div>
             <table className="w-full text-sm">
               <thead>
@@ -225,11 +266,16 @@ export function Reports() {
           </section>
 
           <section className="bg-white border border-slate-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between gap-3">
               <span>Combustível por máquina</span>
-              <span className="text-sm text-slate-500 font-normal">
-                Total: {totalLiters.toFixed(0)} L · R$ {totalFuelCost.toFixed(2)}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500 font-normal">
+                  Total: {totalLiters.toFixed(0)} L · R$ {totalFuelCost.toFixed(2)}
+                </span>
+                <button onClick={exportFuelByMachine} className="text-xs text-slate-500 underline hover:text-slate-900">
+                  Exportar CSV
+                </button>
+              </div>
             </div>
             <table className="w-full text-sm">
               <thead>
@@ -264,11 +310,19 @@ export function Reports() {
           </section>
 
           <section className="bg-white border border-slate-200 rounded-lg">
-            <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between gap-3">
               <span>Manutenções por máquina</span>
-              <span className="text-sm text-slate-500 font-normal">
-                Total: {totalMaintenanceCount} · R$ {totalMaintenanceCost.toFixed(2)}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500 font-normal">
+                  Total: {totalMaintenanceCount} · R$ {totalMaintenanceCost.toFixed(2)}
+                </span>
+                <button
+                  onClick={exportMaintenanceByMachine}
+                  className="text-xs text-slate-500 underline hover:text-slate-900"
+                >
+                  Exportar CSV
+                </button>
+              </div>
             </div>
             <table className="w-full text-sm">
               <thead>

@@ -33,6 +33,9 @@ export function Layout() {
             <Link to="/reports" className={navLinkClass}>
               Relatórios
             </Link>
+            <Link to="/metrics" className={navLinkClass}>
+              Métricas
+            </Link>
             {profile?.role === 'admin' && (
               <Link to="/users" className={navLinkClass}>
                 Usuários

@@ -133,7 +133,7 @@ function MachineForm({ onCreated }: { onCreated: () => void }) {
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-700 mb-1">
-          Intervalo preventivo (h)
+          Intervalo padrão (h)
         </label>
         <input
           type="number"
@@ -143,6 +143,9 @@ function MachineForm({ onCreated }: { onCreated: () => void }) {
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
+      <p className="text-xs text-slate-400 sm:col-span-4">
+        Usado só quando o mecânico não informa "próximo horímetro previsto" ao registrar a manutenção.
+      </p>
       {error && <p className="text-sm text-red-600 sm:col-span-4">{error}</p>}
       <div className="sm:col-span-4">
         <button

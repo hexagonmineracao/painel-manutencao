@@ -102,6 +102,8 @@ export function MachineDetail() {
                       <p className="text-slate-500">
                         {new Date(item.performed_at).toLocaleString('pt-BR')} · horímetro{' '}
                         {item.hourmeter} h
+                        {item.next_due_hourmeter != null &&
+                          ` · próxima em ${item.next_due_hourmeter} h`}
                       </p>
                     </div>
                     {item.cost != null && (

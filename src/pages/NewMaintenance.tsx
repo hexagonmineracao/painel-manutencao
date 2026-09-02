@@ -19,6 +19,7 @@ export function NewMaintenance() {
   const [hourmeter, setHourmeter] = useState('')
   const [type, setType] = useState<MaintenanceType>('preventiva')
   const [description, setDescription] = useState('')
+  const [nextDueHourmeter, setNextDueHourmeter] = useState('')
   const [cost, setCost] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -37,6 +38,7 @@ export function NewMaintenance() {
       type,
       description,
       cost: cost ? Number(cost) : null,
+      next_due_hourmeter: nextDueHourmeter ? Number(nextDueHourmeter) : null,
     })
 
     setSubmitting(false)
@@ -100,6 +102,24 @@ export function NewMaintenance() {
             rows={3}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Próximo horímetro previsto (opcional)
+          </label>
+          <input
+            type="number"
+            step="0.1"
+            placeholder="Ex: 1450 — deixe em branco para usar o intervalo padrão da máquina"
+            value={nextDueHourmeter}
+            onChange={(e) => setNextDueHourmeter(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Em qual horímetro essa manutenção precisa ser feita de novo. Se informado, esse valor manda
+            no alerta de manutenção preventiva em vez do intervalo padrão da máquina.
+          </p>
         </div>
 
         <div>

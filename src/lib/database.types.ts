@@ -29,6 +29,7 @@ export interface MaintenanceRecord {
   type: MaintenanceType
   description: string
   cost: number | null
+  next_due_hourmeter: number | null
   created_at: string
 }
 
@@ -52,4 +53,21 @@ export interface FuelDelivery {
   supplier: string | null
   notes: string | null
   created_at: string
+}
+
+export type AlertSeverity = 'atencao' | 'alerta' | 'critica'
+
+export interface AlertDismissal {
+  id: string
+  alert_key: string
+  dismissed_by: string
+  dismissed_at: string
+  remind_at: string | null
+}
+
+export interface TankSettings {
+  id: number
+  initial_liters: number
+  initial_date: string
+  updated_at: string
 }
