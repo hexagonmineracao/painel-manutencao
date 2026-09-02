@@ -3,14 +3,31 @@
 // deve ficar exposta no frontend estático — ela só existe no runtime da function.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return json({ error: 'Method not allowed' }, 405)
   }
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Não autenticado' }), { status: 401 })
+    return json({ error: 'Não autenticado' }, 401)
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -26,7 +43,7 @@ Deno.serve(async (req) => {
   } = await callerClient.auth.getUser()
 
   if (!caller) {
-    return new Response(JSON.stringify({ error: 'Não autenticado' }), { status: 401 })
+    return json({ error: 'Não autenticado' }, 401)
   }
 
   const { data: callerProfile } = await callerClient
@@ -36,14 +53,12 @@ Deno.serve(async (req) => {
     .single()
 
   if (callerProfile?.role !== 'admin') {
-    return new Response(JSON.stringify({ error: 'Apenas administradores podem criar usuários' }), {
-      status: 403,
-    })
+    return json({ error: 'Apenas administradores podem criar usuários' }, 403)
   }
 
   const { email, password, full_name, role } = await req.json()
   if (!email || !password || !full_name || !role) {
-    return new Response(JSON.stringify({ error: 'Campos obrigatórios ausentes' }), { status: 400 })
+    return json({ error: 'Campos obrigatórios ausentes' }, 400)
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey)
@@ -54,9 +69,7 @@ Deno.serve(async (req) => {
     email_confirm: true,
   })
   if (createError || !created.user) {
-    return new Response(JSON.stringify({ error: createError?.message ?? 'Falha ao criar usuário' }), {
-      status: 400,
-    })
+    return json({ error: createError?.message ?? 'Falha ao criar usuário' }, 400)
   }
 
   const { error: profileError } = await adminClient.from('profiles').insert({
@@ -65,10 +78,8 @@ Deno.serve(async (req) => {
     role,
   })
   if (profileError) {
-    return new Response(JSON.stringify({ error: profileError.message }), { status: 400 })
+    return json({ error: profileError.message }, 400)
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
+  return json({ ok: true })
 })
