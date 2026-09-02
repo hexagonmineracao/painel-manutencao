@@ -1,7 +1,14 @@
 // Edge Function: cria um novo usuário (auth + profile) a pedido de um admin.
 // Necessário porque a criação de usuários exige a service role key, que nunca
 // deve ficar exposta no frontend estático — ela só existe no runtime da function.
+//
+// Login é por "usuário", não por email — o Supabase Auth exige um email
+// internamente, então geramos um email sintético (usuario@painel.local)
+// que nunca é usado pra enviar nada de verdade.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+
+const LOGIN_DOMAIN = 'painel.local'
+const usernameToEmail = (username: string) => `${username.trim().toLowerCase()}@${LOGIN_DOMAIN}`
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,15 +63,24 @@ Deno.serve(async (req) => {
     return json({ error: 'Apenas administradores podem criar usuários' }, 403)
   }
 
-  const { email, password, full_name, role } = await req.json()
-  if (!email || !password || !full_name || !role) {
+  const { username, password, full_name, role } = await req.json()
+  if (!username || !password || !full_name || !role) {
     return json({ error: 'Campos obrigatórios ausentes' }, 400)
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
+  const { data: existing } = await adminClient
+    .from('profiles')
+    .select('id')
+    .eq('username', username.trim().toLowerCase())
+    .maybeSingle()
+  if (existing) {
+    return json({ error: 'Esse nome de usuário já está em uso' }, 400)
+  }
+
   const { data: created, error: createError } = await adminClient.auth.admin.createUser({
-    email,
+    email: usernameToEmail(username),
     password,
     email_confirm: true,
   })
@@ -75,6 +91,7 @@ Deno.serve(async (req) => {
   const { error: profileError } = await adminClient.from('profiles').insert({
     id: created.user.id,
     full_name,
+    username: username.trim().toLowerCase(),
     role,
   })
   if (profileError) {

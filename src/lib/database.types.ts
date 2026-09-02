@@ -4,6 +4,7 @@ export type MaintenanceType = 'preventiva' | 'corretiva' | 'outro'
 export interface Profile {
   id: string
   full_name: string
+  username: string
   role: Role
   created_at: string
 }
@@ -39,5 +40,16 @@ export interface FuelRecord {
   hourmeter: number
   liters: number
   cost: number | null
+  created_at: string
+}
+
+export interface FuelDelivery {
+  id: string
+  user_id: string
+  delivered_at: string
+  liters: number
+  total_cost: number
+  supplier: string | null
+  notes: string | null
   created_at: string
 }

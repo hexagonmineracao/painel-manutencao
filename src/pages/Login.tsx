@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { usernameToEmail } from '../lib/auth'
 
 export function Login() {
   const { session, signIn } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -18,10 +19,10 @@ export function Login() {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
-    const { error } = await signIn(email, password)
+    const { error } = await signIn(usernameToEmail(username), password)
     setSubmitting(false)
     if (error) {
-      setError('Email ou senha inválidos.')
+      setError('Usuário ou senha inválidos.')
       return
     }
     navigate('/')
@@ -37,12 +38,12 @@ export function Login() {
           Painel de Manutenção
         </h1>
 
-        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Usuário</label>
         <input
-          type="email"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          autoCapitalize="none"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           className="w-full mb-4 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
 

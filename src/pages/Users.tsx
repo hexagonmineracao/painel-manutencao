@@ -6,6 +6,7 @@ export function Users() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [resettingId, setResettingId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -44,9 +45,25 @@ export function Users() {
       ) : (
         <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
           {profiles.map((p) => (
-            <div key={p.id} className="px-4 py-3 flex items-center justify-between text-sm">
-              <span className="text-slate-900">{p.full_name}</span>
-              <span className="text-slate-500 capitalize">{p.role}</span>
+            <div key={p.id}>
+              <div className="px-4 py-3 flex items-center justify-between text-sm">
+                <div>
+                  <span className="text-slate-900">{p.full_name}</span>
+                  <span className="text-slate-400 ml-2">@{p.username}</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-slate-500 capitalize">{p.role}</span>
+                  <button
+                    onClick={() => setResettingId(resettingId === p.id ? null : p.id)}
+                    className="text-slate-500 hover:text-slate-900 text-xs underline"
+                  >
+                    Redefinir senha
+                  </button>
+                </div>
+              </div>
+              {resettingId === p.id && (
+                <ResetPasswordForm userId={p.id} onDone={() => setResettingId(null)} />
+              )}
             </div>
           ))}
         </div>
@@ -55,8 +72,59 @@ export function Users() {
   )
 }
 
+function ResetPasswordForm({ userId, onDone }: { userId: string; onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    const { error } = await supabase.functions.invoke('reset-password', {
+      body: { user_id: userId, password },
+    })
+    setSubmitting(false)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    setSuccess(true)
+    setPassword('')
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="px-4 pb-3 flex items-end gap-2 bg-slate-50">
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Nova senha</label>
+        <input
+          type="password"
+          required
+          minLength={6}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="bg-slate-900 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-slate-800 disabled:opacity-50"
+      >
+        {submitting ? 'Salvando...' : 'Salvar'}
+      </button>
+      <button type="button" onClick={onDone} className="text-sm text-slate-500 px-2">
+        Fechar
+      </button>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {success && <p className="text-sm text-green-600">Senha redefinida.</p>}
+    </form>
+  )
+}
+
 function UserForm({ onCreated }: { onCreated: () => void }) {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<Role>('colaborador')
@@ -69,7 +137,7 @@ function UserForm({ onCreated }: { onCreated: () => void }) {
     setError(null)
 
     const { error } = await supabase.functions.invoke('create-user', {
-      body: { email, password, full_name: fullName, role },
+      body: { username, password, full_name: fullName, role },
     })
 
     setSubmitting(false)
@@ -95,12 +163,14 @@ function UserForm({ onCreated }: { onCreated: () => void }) {
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-700 mb-1">Email</label>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Usuário</label>
         <input
-          type="email"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          pattern="[a-zA-Z0-9._-]+"
+          title="Sem espaços ou acentos. Ex: joao.silva"
+          placeholder="joao.silva"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
       </div>

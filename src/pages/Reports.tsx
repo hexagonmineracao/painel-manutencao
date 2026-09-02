@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import type { FuelRecord, Machine, MaintenanceRecord } from '../lib/database.types'
+import type { FuelDelivery, FuelRecord, Machine, MaintenanceRecord } from '../lib/database.types'
 
 function daysAgoInput(days: number) {
   const d = new Date()
@@ -32,6 +32,7 @@ export function Reports() {
   const [loading, setLoading] = useState(true)
   const [fuelRows, setFuelRows] = useState<FuelRow[]>([])
   const [maintenanceRows, setMaintenanceRows] = useState<MaintenanceRow[]>([])
+  const [deliveries, setDeliveries] = useState<FuelDelivery[]>([])
 
   useEffect(() => {
     async function load() {
@@ -39,7 +40,7 @@ export function Reports() {
       const fromISO = new Date(from + 'T00:00:00').toISOString()
       const toISO = new Date(to + 'T23:59:59').toISOString()
 
-      const [machinesRes, fuelRes, maintenanceRes] = await Promise.all([
+      const [machinesRes, fuelRes, maintenanceRes, deliveriesRes] = await Promise.all([
         supabase.from('machines').select('*').order('name').returns<Machine[]>(),
         supabase
           .from('fuel_records')
@@ -53,11 +54,19 @@ export function Reports() {
           .gte('performed_at', fromISO)
           .lte('performed_at', toISO)
           .returns<MaintenanceRecord[]>(),
+        supabase
+          .from('fuel_deliveries')
+          .select('*')
+          .gte('delivered_at', fromISO)
+          .lte('delivered_at', toISO)
+          .order('delivered_at', { ascending: false })
+          .returns<FuelDelivery[]>(),
       ])
 
       const machines = machinesRes.data ?? []
       const fuel = fuelRes.data ?? []
       const maintenance = maintenanceRes.data ?? []
+      setDeliveries(deliveriesRes.data ?? [])
 
       const fuelByMachine = new Map<string, FuelRecord[]>()
       for (const rec of fuel) {
@@ -115,6 +124,11 @@ export function Reports() {
   const totalMaintenanceCost = maintenanceRows.reduce((s, r) => s + r.cost, 0)
   const totalMaintenanceCount = maintenanceRows.reduce((s, r) => s + r.count, 0)
 
+  const totalDeliveredLiters = deliveries.reduce((s, d) => s + Number(d.liters), 0)
+  const totalDeliveredCost = deliveries.reduce((s, d) => s + Number(d.total_cost), 0)
+  const avgPricePerLiter = totalDeliveredLiters > 0 ? totalDeliveredCost / totalDeliveredLiters : null
+  const balance = totalDeliveredLiters - totalLiters
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-slate-900">Relatórios</h1>
@@ -144,6 +158,72 @@ export function Reports() {
         <p className="text-slate-500">Carregando...</p>
       ) : (
         <>
+          <section className="bg-white border border-slate-200 rounded-lg">
+            <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between">
+              <span>Entrada de combustível (tanque principal)</span>
+              <span className="text-sm text-slate-500 font-normal">
+                Total: {totalDeliveredLiters.toFixed(0)} L · R$ {totalDeliveredCost.toFixed(2)}
+                {avgPricePerLiter != null && ` · média R$ ${avgPricePerLiter.toFixed(3)}/L`}
+              </span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-100">
+                  <th className="px-4 py-2 font-medium">Data</th>
+                  <th className="px-4 py-2 font-medium">Litros</th>
+                  <th className="px-4 py-2 font-medium">Valor</th>
+                  <th className="px-4 py-2 font-medium">R$/L</th>
+                  <th className="px-4 py-2 font-medium">Fornecedor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveries.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-4 text-slate-500">
+                      Sem entradas no período.
+                    </td>
+                  </tr>
+                ) : (
+                  deliveries.map((d) => (
+                    <tr key={d.id} className="border-b border-slate-50 last:border-0">
+                      <td className="px-4 py-2 text-slate-900">
+                        {new Date(d.delivered_at).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-4 py-2">{Number(d.liters).toFixed(1)} L</td>
+                      <td className="px-4 py-2">R$ {Number(d.total_cost).toFixed(2)}</td>
+                      <td className="px-4 py-2">R$ {(Number(d.total_cost) / Number(d.liters)).toFixed(3)}</td>
+                      <td className="px-4 py-2 text-slate-500">{d.supplier ?? '—'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="bg-white border border-slate-200 rounded-lg px-4 py-3">
+            <div className="font-medium text-slate-900 mb-2">Balanço do período</div>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-slate-500">Entrada</p>
+                <p className="text-slate-900 font-medium">{totalDeliveredLiters.toFixed(0)} L</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Saída (abastecido nas máquinas)</p>
+                <p className="text-slate-900 font-medium">{totalLiters.toFixed(0)} L</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Diferença</p>
+                <p className={balance < 0 ? 'text-red-600 font-medium' : 'text-slate-900 font-medium'}>
+                  {balance.toFixed(0)} L
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">
+              A diferença reflete o saldo do tanque no período (ou quebra de medição entre entrada e
+              saída) — não considera o estoque inicial do tanque.
+            </p>
+          </section>
+
           <section className="bg-white border border-slate-200 rounded-lg">
             <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between">
               <span>Combustível por máquina</span>

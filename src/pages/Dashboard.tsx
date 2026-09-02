@@ -17,6 +17,8 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [fuelCostMonth, setFuelCostMonth] = useState(0)
   const [fuelLitersMonth, setFuelLitersMonth] = useState(0)
+  const [deliveredLitersMonth, setDeliveredLitersMonth] = useState(0)
+  const [deliveredCostMonth, setDeliveredCostMonth] = useState(0)
   const [maintenanceCostMonth, setMaintenanceCostMonth] = useState(0)
   const [maintenanceCountMonth, setMaintenanceCountMonth] = useState(0)
   const [alerts, setAlerts] = useState<Alert[]>([])
@@ -26,12 +28,17 @@ export function Dashboard() {
       setLoading(true)
       const since = startOfMonthISO()
 
-      const [fuelRes, maintenanceRes, machinesRes, lastMaintenanceRes] = await Promise.all([
+      const [fuelRes, deliveriesRes, maintenanceRes, machinesRes, lastMaintenanceRes] = await Promise.all([
         supabase
           .from('fuel_records')
           .select('liters, cost')
           .gte('recorded_at', since)
           .returns<Array<{ liters: number; cost: number | null }>>(),
+        supabase
+          .from('fuel_deliveries')
+          .select('liters, total_cost')
+          .gte('delivered_at', since)
+          .returns<Array<{ liters: number; total_cost: number }>>(),
         supabase
           .from('maintenance_records')
           .select('cost')
@@ -48,6 +55,10 @@ export function Dashboard() {
       const fuel = fuelRes.data ?? []
       setFuelLitersMonth(fuel.reduce((sum, r) => sum + Number(r.liters ?? 0), 0))
       setFuelCostMonth(fuel.reduce((sum, r) => sum + Number(r.cost ?? 0), 0))
+
+      const deliveries = deliveriesRes.data ?? []
+      setDeliveredLitersMonth(deliveries.reduce((sum, r) => sum + Number(r.liters ?? 0), 0))
+      setDeliveredCostMonth(deliveries.reduce((sum, r) => sum + Number(r.total_cost ?? 0), 0))
 
       const maintenance = maintenanceRes.data ?? []
       setMaintenanceCountMonth(maintenance.length)
@@ -87,8 +98,9 @@ export function Dashboard() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card label="Combustível no mês" value={`${fuelLitersMonth.toFixed(0)} L`} sub={`R$ ${fuelCostMonth.toFixed(2)}`} />
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <Card label="Combustível abastecido no mês" value={`${fuelLitersMonth.toFixed(0)} L`} sub={`R$ ${fuelCostMonth.toFixed(2)}`} />
+        <Card label="Combustível recebido no mês" value={`${deliveredLitersMonth.toFixed(0)} L`} sub={`R$ ${deliveredCostMonth.toFixed(2)}`} />
         <Card label="Manutenções no mês" value={`${maintenanceCountMonth}`} sub={`R$ ${maintenanceCostMonth.toFixed(2)}`} />
         <Card label="Alertas de manutenção" value={`${alerts.length}`} sub="preventivas próximas/vencidas" />
       </div>

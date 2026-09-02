@@ -4,10 +4,12 @@ Painel web para gestão de manutenção, controle de combustível e horímetro d
 
 - Cadastro de máquinas (modelo, nome/apelido, número)
 - Registro de manutenções (o que foi feito, quando, horímetro, custo)
-- Registro de abastecimento e horímetro (data/hora, litros, custo)
-- Relatórios de consumo de combustível e manutenções, gerais e por máquina
+- Registro de abastecimento e horímetro por máquina (data/hora, litros, custo)
+- Registro de entrada de combustível no tanque principal (litros, valor total, fornecedor)
+- Relatórios de consumo de combustível e manutenções (gerais e por máquina), entrada de combustível com preço médio no período, e balanço entrada x saída
 - Alertas de manutenção preventiva com base no intervalo de horímetro
-- Login por email/senha, com dois papéis: `admin` (gerencia máquinas e usuários) e `colaborador` (mecânico/operador, registra manutenções e abastecimentos)
+- Login por usuário/senha (não por email), com dois papéis: `admin` (gerencia máquinas e usuários) e `colaborador` (mecânico/operador, registra manutenções e abastecimentos)
+- Cada usuário pode trocar a própria senha em "Minha conta"; o admin pode redefinir a senha de qualquer usuário na tela "Usuários"
 
 ## Stack
 
@@ -19,18 +21,20 @@ Painel web para gestão de manutenção, controle de combustível e horímetro d
 
 1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
 2. Rode a migration em `supabase/migrations/0001_init.sql` no **SQL Editor** do painel Supabase (ou via `supabase db push`, se tiver o [Supabase CLI](https://supabase.com/docs/guides/cli) instalado e o projeto linkado).
-3. Deploy da Edge Function que cria novos usuários (usada pela tela "Usuários"):
+3. Deploy das Edge Functions que criam usuários e redefinem senha (usadas pela tela "Usuários"):
    ```bash
    supabase functions deploy create-user
+   supabase functions deploy reset-password
    ```
 4. Crie o primeiro usuário administrador:
-   - Vá em **Authentication > Users** no painel Supabase e crie um usuário com email/senha.
+   - O login é por usuário, não por email — internamente cada usuário vira um email sintético `usuario@painel.local` (nunca usado pra enviar nada de verdade).
+   - Vá em **Authentication > Users** no painel Supabase → "Add user" → email `seuusuario@painel.local` + senha (marque "Auto Confirm User").
    - No **SQL Editor**, rode (substituindo o UUID pelo do usuário criado):
      ```sql
-     insert into profiles (id, full_name, role)
-     values ('UUID-DO-USUARIO', 'Seu Nome', 'admin');
+     insert into profiles (id, full_name, username, role)
+     values ('UUID-DO-USUARIO', 'Seu Nome', 'seuusuario', 'admin');
      ```
-   - Os próximos usuários (mecânicos/colaboradores) podem ser criados direto pela tela "Usuários" do painel, já logado como admin.
+   - Os próximos usuários (mecânicos/colaboradores) podem ser criados direto pela tela "Usuários" do painel, já logado como admin — só nome, usuário e senha provisória.
 
 ## Rodando localmente
 

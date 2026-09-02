@@ -27,6 +27,9 @@ export function Layout() {
             <Link to="/machines" className={navLinkClass}>
               Máquinas
             </Link>
+            <Link to="/fuel-deliveries" className={navLinkClass}>
+              Entrada de combustível
+            </Link>
             <Link to="/reports" className={navLinkClass}>
               Relatórios
             </Link>
@@ -37,7 +40,9 @@ export function Layout() {
             )}
           </nav>
           <div className="flex items-center gap-3 text-sm">
-            <span className="text-slate-500">{profile?.full_name}</span>
+            <Link to="/account" className="text-slate-500 hover:text-slate-900">
+              {profile?.full_name}
+            </Link>
             <button
               onClick={handleSignOut}
               className="text-slate-500 hover:text-slate-900"
