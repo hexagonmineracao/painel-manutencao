@@ -24,13 +24,21 @@ function nowForInput() {
   return now.toISOString().slice(0, 16)
 }
 
+function toInputValue(iso: string) {
+  const d = new Date(iso)
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 16)
+}
+
 export function Materials() {
+  const { profile } = useAuth()
   const [materials, setMaterials] = useState<Material[]>([])
   const [movements, setMovements] = useState<MaterialMovement[]>([])
   const [machines, setMachines] = useState<Machine[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewForm, setShowNewForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -59,6 +67,19 @@ export function Materials() {
       .reduce((sum, m) => sum + (m.type === 'entrada' ? Number(m.quantity) : -Number(m.quantity)), 0)
   }
 
+  async function handleDeleteMaterial(material: Material) {
+    const confirmed = window.confirm(
+      `Excluir "${material.name}"? Isso também apaga todas as movimentações registradas dele. Essa ação não pode ser desfeita.`,
+    )
+    if (!confirmed) return
+    const { error } = await supabase.from('materials').delete().eq('id', material.id)
+    if (error) {
+      alert(error.message)
+      return
+    }
+    load()
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -75,9 +96,9 @@ export function Materials() {
       </div>
 
       {showNewForm && (
-        <NewMaterialForm
+        <MaterialForm
           existing={materials}
-          onCreated={() => {
+          onSaved={() => {
             setShowNewForm(false)
             load()
           }}
@@ -99,21 +120,55 @@ export function Materials() {
             const low = mat.min_stock != null && balance < mat.min_stock
             return (
               <div key={mat.id}>
-                <button
-                  onClick={() => setExpandedId(expandedId === mat.id ? null : mat.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-slate-50 text-left"
-                >
-                  <span className="font-medium text-slate-900">{mat.name}</span>
-                  <span className={low ? 'text-red-600 font-medium' : 'text-slate-500'}>
-                    {balance.toFixed(1)} {mat.unit}
-                    {low && ' · estoque baixo'}
-                  </span>
-                </button>
+                <div className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-slate-50">
+                  <button
+                    onClick={() => setExpandedId(expandedId === mat.id ? null : mat.id)}
+                    className="font-medium text-slate-900 text-left"
+                  >
+                    {mat.name}
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <span className={low ? 'text-red-600 font-medium' : 'text-slate-500'}>
+                      {balance.toFixed(1)} {mat.unit}
+                      {low && ' · estoque baixo'}
+                    </span>
+                    {profile?.role === 'admin' && (
+                      <>
+                        <button
+                          onClick={() => setEditingMaterialId(editingMaterialId === mat.id ? null : mat.id)}
+                          className="text-xs text-slate-500 underline hover:text-slate-900"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMaterial(mat)}
+                          className="text-xs text-red-600 underline hover:text-red-800"
+                        >
+                          Excluir
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {editingMaterialId === mat.id && (
+                  <div className="px-4 pb-4">
+                    <MaterialForm
+                      existing={materials}
+                      initial={mat}
+                      onSaved={() => {
+                        setEditingMaterialId(null)
+                        load()
+                      }}
+                      onCancel={() => setEditingMaterialId(null)}
+                    />
+                  </div>
+                )}
                 {expandedId === mat.id && (
                   <MaterialPanel
                     material={mat}
                     machines={machines}
                     movements={movements.filter((m) => m.material_id === mat.id)}
+                    isAdmin={profile?.role === 'admin'}
                     onChanged={load}
                   />
                 )}
@@ -126,23 +181,27 @@ export function Materials() {
   )
 }
 
-function NewMaterialForm({
+function MaterialForm({
   existing,
-  onCreated,
+  initial,
+  onSaved,
   onUseExisting,
+  onCancel,
 }: {
   existing: Material[]
-  onCreated: () => void
-  onUseExisting: (materialId: string) => void
+  initial?: Material
+  onSaved: () => void
+  onUseExisting?: (materialId: string) => void
+  onCancel?: () => void
 }) {
-  const [name, setName] = useState('')
-  const [unit, setUnit] = useState('')
-  const [minStock, setMinStock] = useState('')
+  const [name, setName] = useState(initial?.name ?? '')
+  const [unit, setUnit] = useState(initial?.unit ?? '')
+  const [minStock, setMinStock] = useState(initial?.min_stock != null ? String(initial.min_stock) : '')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const suggestions =
-    name.trim().length >= 2
+    !initial && name.trim().length >= 2
       ? existing.filter((m) => normalize(m.name).includes(normalize(name))).slice(0, 5)
       : []
 
@@ -150,17 +209,16 @@ function NewMaterialForm({
     e.preventDefault()
     setSubmitting(true)
     setError(null)
-    const { error } = await supabase.from('materials').insert({
-      name,
-      unit,
-      min_stock: minStock ? Number(minStock) : null,
-    })
+    const payload = { name, unit, min_stock: minStock ? Number(minStock) : null }
+    const { error } = initial
+      ? await supabase.from('materials').update(payload).eq('id', initial.id)
+      : await supabase.from('materials').insert(payload)
     setSubmitting(false)
     if (error) {
       setError(error.message)
       return
     }
-    onCreated()
+    onSaved()
   }
 
   return (
@@ -186,13 +244,15 @@ function NewMaterialForm({
                 <span className="text-slate-700">
                   {s.name} <span className="text-slate-400">({s.unit})</span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => onUseExisting(s.id)}
-                  className="text-slate-500 underline hover:text-slate-900 text-xs whitespace-nowrap ml-2"
-                >
-                  Usar este
-                </button>
+                {onUseExisting && (
+                  <button
+                    type="button"
+                    onClick={() => onUseExisting(s.id)}
+                    className="text-slate-500 underline hover:text-slate-900 text-xs whitespace-nowrap ml-2"
+                  >
+                    Usar este
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -219,14 +279,19 @@ function NewMaterialForm({
         />
       </div>
       {error && <p className="text-sm text-red-600 sm:col-span-3">{error}</p>}
-      <div className="sm:col-span-3">
+      <div className="sm:col-span-3 flex items-center gap-2">
         <button
           type="submit"
           disabled={submitting}
           className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
         >
-          {submitting ? 'Salvando...' : 'Salvar material'}
+          {submitting ? 'Salvando...' : initial ? 'Salvar alterações' : 'Salvar material'}
         </button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="text-sm text-slate-500 px-2">
+            Cancelar
+          </button>
+        )}
       </div>
     </form>
   )
@@ -236,33 +301,53 @@ function MaterialPanel({
   material,
   machines,
   movements,
+  isAdmin,
   onChanged,
 }: {
   material: Material
   machines: Machine[]
   movements: MaterialMovement[]
+  isAdmin: boolean
   onChanged: () => void
 }) {
   const [formType, setFormType] = useState<MaterialMovementType | null>(null)
+  const [editingMovement, setEditingMovement] = useState<MaterialMovement | null>(null)
+
+  async function handleDeleteMovement(movement: MaterialMovement) {
+    const confirmed = window.confirm('Excluir essa movimentação? Essa ação não pode ser desfeita.')
+    if (!confirmed) return
+    const { error } = await supabase.from('material_movements').delete().eq('id', movement.id)
+    if (error) {
+      alert(error.message)
+      return
+    }
+    onChanged()
+  }
 
   return (
     <div className="bg-slate-50 px-4 py-4 space-y-4 border-t border-slate-100">
       <div className="flex items-center gap-2">
         <button
-          onClick={() => setFormType(formType === 'entrada' ? null : 'entrada')}
+          onClick={() => {
+            setEditingMovement(null)
+            setFormType(formType === 'entrada' ? null : 'entrada')
+          }}
           className="text-sm bg-white border border-slate-300 px-3 py-1.5 rounded-md hover:bg-slate-100"
         >
           Registrar entrada
         </button>
         <button
-          onClick={() => setFormType(formType === 'saida' ? null : 'saida')}
+          onClick={() => {
+            setEditingMovement(null)
+            setFormType(formType === 'saida' ? null : 'saida')
+          }}
           className="text-sm bg-white border border-slate-300 px-3 py-1.5 rounded-md hover:bg-slate-100"
         >
           Registrar saída
         </button>
       </div>
 
-      {formType && (
+      {formType && !editingMovement && (
         <MovementForm
           material={material}
           machines={machines}
@@ -271,6 +356,20 @@ function MaterialPanel({
             setFormType(null)
             onChanged()
           }}
+        />
+      )}
+
+      {editingMovement && (
+        <MovementForm
+          material={material}
+          machines={machines}
+          type={editingMovement.type}
+          initial={editingMovement}
+          onSaved={() => {
+            setEditingMovement(null)
+            onChanged()
+          }}
+          onCancel={() => setEditingMovement(null)}
         />
       )}
 
@@ -283,7 +382,10 @@ function MaterialPanel({
             {movements.slice(0, 10).map((m) => {
               const machine = machines.find((mac) => mac.id === m.machine_id)
               return (
-                <li key={m.id} className="text-sm flex items-center justify-between bg-white rounded-md px-3 py-2 border border-slate-100">
+                <li
+                  key={m.id}
+                  className="text-sm flex items-center justify-between bg-white rounded-md px-3 py-2 border border-slate-100"
+                >
                   <span>
                     <span className={m.type === 'entrada' ? 'text-green-700' : 'text-slate-700'}>
                       {m.type === 'entrada' ? '+ ' : '- '}
@@ -292,8 +394,27 @@ function MaterialPanel({
                     {machine && <span className="text-slate-400"> · {machine.name}</span>}
                     {m.notes && <span className="text-slate-400"> · {m.notes}</span>}
                   </span>
-                  <span className="text-slate-400 whitespace-nowrap">
-                    {new Date(m.moved_at).toLocaleDateString('pt-BR')}
+                  <span className="flex items-center gap-2 whitespace-nowrap">
+                    <span className="text-slate-400">{new Date(m.moved_at).toLocaleDateString('pt-BR')}</span>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setFormType(null)
+                            setEditingMovement(editingMovement?.id === m.id ? null : m)
+                          }}
+                          className="text-xs text-slate-500 underline hover:text-slate-900"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMovement(m)}
+                          className="text-xs text-red-600 underline hover:text-red-800"
+                        >
+                          Excluir
+                        </button>
+                      </>
+                    )}
                   </span>
                 </li>
               )
@@ -309,19 +430,23 @@ function MovementForm({
   material,
   machines,
   type,
+  initial,
   onSaved,
+  onCancel,
 }: {
   material: Material
   machines: Machine[]
   type: MaterialMovementType
+  initial?: MaterialMovement
   onSaved: () => void
+  onCancel?: () => void
 }) {
   const { session } = useAuth()
-  const [movedAt, setMovedAt] = useState(nowForInput())
-  const [quantity, setQuantity] = useState('')
-  const [machineId, setMachineId] = useState('')
-  const [cost, setCost] = useState('')
-  const [notes, setNotes] = useState('')
+  const [movedAt, setMovedAt] = useState(initial ? toInputValue(initial.moved_at) : nowForInput())
+  const [quantity, setQuantity] = useState(initial ? String(initial.quantity) : '')
+  const [machineId, setMachineId] = useState(initial?.machine_id ?? '')
+  const [cost, setCost] = useState(initial?.cost != null ? String(initial.cost) : '')
+  const [notes, setNotes] = useState(initial?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -331,16 +456,22 @@ function MovementForm({
     setSubmitting(true)
     setError(null)
 
-    const { error } = await supabase.from('material_movements').insert({
-      material_id: material.id,
+    const payload = {
       machine_id: type === 'saida' && machineId ? machineId : null,
-      user_id: session.user.id,
       type,
       quantity: Number(quantity),
       cost: type === 'entrada' && cost ? Number(cost) : null,
       moved_at: new Date(movedAt).toISOString(),
       notes: notes || null,
-    })
+    }
+
+    const { error } = initial
+      ? await supabase.from('material_movements').update(payload).eq('id', initial.id)
+      : await supabase.from('material_movements').insert({
+          ...payload,
+          material_id: material.id,
+          user_id: session.user.id,
+        })
 
     setSubmitting(false)
     if (error) {
@@ -413,14 +544,19 @@ function MovementForm({
         />
       </div>
       {error && <p className="text-sm text-red-600 sm:col-span-3">{error}</p>}
-      <div className="sm:col-span-3">
+      <div className="sm:col-span-3 flex items-center gap-2">
         <button
           type="submit"
           disabled={submitting}
           className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
         >
-          {submitting ? 'Salvando...' : 'Salvar'}
+          {submitting ? 'Salvando...' : initial ? 'Salvar alterações' : 'Salvar'}
         </button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="text-sm text-slate-500 px-2">
+            Cancelar
+          </button>
+        )}
       </div>
     </form>
   )

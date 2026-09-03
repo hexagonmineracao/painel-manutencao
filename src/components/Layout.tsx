@@ -35,7 +35,7 @@ export function Layout() {
             <Link to="/" className="font-semibold text-slate-900 shrink-0">
               Painel Manutenção
             </Link>
-            <nav className="hidden sm:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-1">
               {visibleLinks.map((link) => (
                 <Link key={link.to} to={link.to} className={navLinkClass}>
                   {link.label}
@@ -44,7 +44,7 @@ export function Layout() {
             </nav>
           </div>
 
-          <div className="hidden sm:flex items-center gap-3 text-sm">
+          <div className="hidden lg:flex items-center gap-3 text-sm">
             <Link to="/account" className="text-slate-500 hover:text-slate-900">
               {profile?.full_name}
             </Link>
@@ -56,7 +56,7 @@ export function Layout() {
           <button
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Abrir menu"
-            className="sm:hidden p-2 -mr-2 text-slate-700"
+            className="lg:hidden p-2 -mr-2 text-slate-700"
           >
             {menuOpen ? (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -71,7 +71,7 @@ export function Layout() {
         </div>
 
         {menuOpen && (
-          <nav className="sm:hidden border-t border-slate-200 px-2 py-2">
+          <nav className="lg:hidden border-t border-slate-200 px-2 py-2">
             {visibleLinks.map((link) => (
               <Link
                 key={link.to}

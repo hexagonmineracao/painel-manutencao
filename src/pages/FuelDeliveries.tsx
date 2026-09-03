@@ -18,6 +18,7 @@ export function FuelDeliveries() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -73,6 +74,17 @@ export function FuelDeliveries() {
         d.notes ?? '',
       ]),
     )
+  }
+
+  async function handleDelete(delivery: FuelDelivery) {
+    const confirmed = window.confirm('Excluir essa entrada de combustível? Essa ação não pode ser desfeita.')
+    if (!confirmed) return
+    const { error } = await supabase.from('fuel_deliveries').delete().eq('id', delivery.id)
+    if (error) {
+      alert(error.message)
+      return
+    }
+    load()
   }
 
   return (
@@ -147,19 +159,51 @@ export function FuelDeliveries() {
       ) : (
         <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
           {deliveries.map((d) => (
-            <div key={d.id} className="px-4 py-3 flex items-center justify-between text-sm">
-              <div>
-                <p className="font-medium text-slate-900">
-                  {d.liters.toFixed(1)} L {d.supplier ? `· ${d.supplier}` : ''}
-                </p>
-                <p className="text-slate-500">
-                  {new Date(d.delivered_at).toLocaleString('pt-BR')} · R${' '}
-                  {(d.total_cost / d.liters).toFixed(3)}/L
-                </p>
+            <div key={d.id}>
+              <div className="px-4 py-3 flex items-center justify-between text-sm">
+                <div>
+                  <p className="font-medium text-slate-900">
+                    {d.liters.toFixed(1)} L {d.supplier ? `· ${d.supplier}` : ''}
+                  </p>
+                  <p className="text-slate-500">
+                    {new Date(d.delivered_at).toLocaleString('pt-BR')} · R${' '}
+                    {(d.total_cost / d.liters).toFixed(3)}/L
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-500 whitespace-nowrap">
+                    R$ {Number(d.total_cost).toFixed(2)}
+                  </span>
+                  {profile?.role === 'admin' && (
+                    <>
+                      <button
+                        onClick={() => setEditingId(editingId === d.id ? null : d.id)}
+                        className="text-xs text-slate-500 underline hover:text-slate-900"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(d)}
+                        className="text-xs text-red-600 underline hover:text-red-800"
+                      >
+                        Excluir
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              <span className="text-slate-500 whitespace-nowrap">
-                R$ {Number(d.total_cost).toFixed(2)}
-              </span>
+              {editingId === d.id && (
+                <div className="px-4 pb-4">
+                  <DeliveryForm
+                    initial={d}
+                    onCreated={() => {
+                      setEditingId(null)
+                      load()
+                    }}
+                    onCancel={() => setEditingId(null)}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -237,13 +281,23 @@ function TankSettingsForm({ settings, onSaved }: { settings: TankSettings; onSav
   )
 }
 
-function DeliveryForm({ onCreated }: { onCreated: () => void }) {
+function DeliveryForm({
+  initial,
+  onCreated,
+  onCancel,
+}: {
+  initial?: FuelDelivery
+  onCreated: () => void
+  onCancel?: () => void
+}) {
   const { session } = useAuth()
-  const [deliveredAt, setDeliveredAt] = useState(nowForInput())
-  const [liters, setLiters] = useState('')
-  const [totalCost, setTotalCost] = useState('')
-  const [supplier, setSupplier] = useState('')
-  const [notes, setNotes] = useState('')
+  const [deliveredAt, setDeliveredAt] = useState(
+    initial ? initial.delivered_at.slice(0, 16) : nowForInput(),
+  )
+  const [liters, setLiters] = useState(initial ? String(initial.liters) : '')
+  const [totalCost, setTotalCost] = useState(initial ? String(initial.total_cost) : '')
+  const [supplier, setSupplier] = useState(initial?.supplier ?? '')
+  const [notes, setNotes] = useState(initial?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -253,14 +307,17 @@ function DeliveryForm({ onCreated }: { onCreated: () => void }) {
     setSubmitting(true)
     setError(null)
 
-    const { error } = await supabase.from('fuel_deliveries').insert({
-      user_id: session.user.id,
+    const payload = {
       delivered_at: new Date(deliveredAt).toISOString(),
       liters: Number(liters),
       total_cost: Number(totalCost),
       supplier: supplier || null,
       notes: notes || null,
-    })
+    }
+
+    const { error } = initial
+      ? await supabase.from('fuel_deliveries').update(payload).eq('id', initial.id)
+      : await supabase.from('fuel_deliveries').insert({ ...payload, user_id: session.user.id })
 
     setSubmitting(false)
     if (error) {
@@ -326,14 +383,19 @@ function DeliveryForm({ onCreated }: { onCreated: () => void }) {
         />
       </div>
       {error && <p className="text-sm text-red-600 sm:col-span-3">{error}</p>}
-      <div className="sm:col-span-3">
+      <div className="sm:col-span-3 flex items-center gap-2">
         <button
           type="submit"
           disabled={submitting}
           className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
         >
-          {submitting ? 'Salvando...' : 'Salvar entrada'}
+          {submitting ? 'Salvando...' : initial ? 'Salvar alterações' : 'Salvar entrada'}
         </button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="text-sm text-slate-500 px-2">
+            Cancelar
+          </button>
+        )}
       </div>
     </form>
   )

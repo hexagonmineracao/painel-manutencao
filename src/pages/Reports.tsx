@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { exportToCsv } from '../lib/csv'
-import type { FuelDelivery, FuelRecord, Machine, MaintenanceRecord } from '../lib/database.types'
+import type {
+  FuelDelivery,
+  FuelRecord,
+  Machine,
+  MaintenanceRecord,
+  Material,
+  MaterialMovement,
+} from '../lib/database.types'
 
 function daysAgoInput(days: number) {
   const d = new Date()
@@ -27,6 +34,13 @@ interface MaintenanceRow {
   cost: number
 }
 
+interface MaterialRow {
+  material: Material
+  entradaQty: number
+  entradaCost: number
+  saidaQty: number
+}
+
 export function Reports() {
   const [from, setFrom] = useState(daysAgoInput(30))
   const [to, setTo] = useState(todayInput())
@@ -34,6 +48,7 @@ export function Reports() {
   const [fuelRows, setFuelRows] = useState<FuelRow[]>([])
   const [maintenanceRows, setMaintenanceRows] = useState<MaintenanceRow[]>([])
   const [deliveries, setDeliveries] = useState<FuelDelivery[]>([])
+  const [materialRows, setMaterialRows] = useState<MaterialRow[]>([])
 
   useEffect(() => {
     async function load() {
@@ -41,33 +56,65 @@ export function Reports() {
       const fromISO = new Date(from + 'T00:00:00').toISOString()
       const toISO = new Date(to + 'T23:59:59').toISOString()
 
-      const [machinesRes, fuelRes, maintenanceRes, deliveriesRes] = await Promise.all([
-        supabase.from('machines').select('*').order('name').returns<Machine[]>(),
-        supabase
-          .from('fuel_records')
-          .select('*')
-          .gte('recorded_at', fromISO)
-          .lte('recorded_at', toISO)
-          .returns<FuelRecord[]>(),
-        supabase
-          .from('maintenance_records')
-          .select('*')
-          .gte('performed_at', fromISO)
-          .lte('performed_at', toISO)
-          .returns<MaintenanceRecord[]>(),
-        supabase
-          .from('fuel_deliveries')
-          .select('*')
-          .gte('delivered_at', fromISO)
-          .lte('delivered_at', toISO)
-          .order('delivered_at', { ascending: false })
-          .returns<FuelDelivery[]>(),
-      ])
+      const [machinesRes, fuelRes, maintenanceRes, deliveriesRes, materialsRes, movementsRes] =
+        await Promise.all([
+          supabase.from('machines').select('*').order('name').returns<Machine[]>(),
+          supabase
+            .from('fuel_records')
+            .select('*')
+            .gte('recorded_at', fromISO)
+            .lte('recorded_at', toISO)
+            .returns<FuelRecord[]>(),
+          supabase
+            .from('maintenance_records')
+            .select('*')
+            .gte('performed_at', fromISO)
+            .lte('performed_at', toISO)
+            .returns<MaintenanceRecord[]>(),
+          supabase
+            .from('fuel_deliveries')
+            .select('*')
+            .gte('delivered_at', fromISO)
+            .lte('delivered_at', toISO)
+            .order('delivered_at', { ascending: false })
+            .returns<FuelDelivery[]>(),
+          supabase.from('materials').select('*').order('name').returns<Material[]>(),
+          supabase
+            .from('material_movements')
+            .select('*')
+            .gte('moved_at', fromISO)
+            .lte('moved_at', toISO)
+            .returns<MaterialMovement[]>(),
+        ])
 
       const machines = machinesRes.data ?? []
       const fuel = fuelRes.data ?? []
       const maintenance = maintenanceRes.data ?? []
       setDeliveries(deliveriesRes.data ?? [])
+
+      const materials = materialsRes.data ?? []
+      const movements = movementsRes.data ?? []
+      const movementsByMaterial = new Map<string, MaterialMovement[]>()
+      for (const mv of movements) {
+        const list = movementsByMaterial.get(mv.material_id) ?? []
+        list.push(mv)
+        movementsByMaterial.set(mv.material_id, list)
+      }
+      const computedMaterialRows: MaterialRow[] = materials
+        .map((material) => {
+          const recs = movementsByMaterial.get(material.id) ?? []
+          if (recs.length === 0) return null
+          const entradas = recs.filter((r) => r.type === 'entrada')
+          const saidas = recs.filter((r) => r.type === 'saida')
+          return {
+            material,
+            entradaQty: entradas.reduce((s, r) => s + Number(r.quantity), 0),
+            entradaCost: entradas.reduce((s, r) => s + Number(r.cost ?? 0), 0),
+            saidaQty: saidas.reduce((s, r) => s + Number(r.quantity), 0),
+          }
+        })
+        .filter((r): r is MaterialRow => r !== null)
+      setMaterialRows(computedMaterialRows)
 
       const fuelByMachine = new Map<string, FuelRecord[]>()
       for (const rec of fuel) {
@@ -162,6 +209,19 @@ export function Reports() {
       `manutencoes_por_maquina_${from}_a_${to}`,
       ['Máquina', 'Quantidade', 'Custo'],
       maintenanceRows.map((r) => [r.machine.name, r.count, r.cost.toFixed(2)]),
+    )
+  }
+
+  function exportMaterials() {
+    exportToCsv(
+      `materiais_${from}_a_${to}`,
+      ['Material', 'Entradas', 'Custo entradas', 'Saídas'],
+      materialRows.map((r) => [
+        r.material.name,
+        `${r.entradaQty.toFixed(1)} ${r.material.unit}`,
+        r.entradaCost.toFixed(2),
+        `${r.saidaQty.toFixed(1)} ${r.material.unit}`,
+      ]),
     )
   }
 
@@ -355,6 +415,49 @@ export function Reports() {
                 )}
               </tbody>
             </table>
+            </div>
+          </section>
+
+          <section className="bg-white border border-slate-200 rounded-lg">
+            <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between gap-3">
+              <span>Materiais (estoque)</span>
+              <button onClick={exportMaterials} className="text-xs text-slate-500 underline hover:text-slate-900">
+                Exportar CSV
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 border-b border-slate-100">
+                    <th className="px-4 py-2 font-medium">Material</th>
+                    <th className="px-4 py-2 font-medium">Entradas</th>
+                    <th className="px-4 py-2 font-medium">Custo entradas</th>
+                    <th className="px-4 py-2 font-medium">Saídas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {materialRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-4 text-slate-500">
+                        Sem movimentações no período.
+                      </td>
+                    </tr>
+                  ) : (
+                    materialRows.map((row) => (
+                      <tr key={row.material.id} className="border-b border-slate-50 last:border-0">
+                        <td className="px-4 py-2 text-slate-900">{row.material.name}</td>
+                        <td className="px-4 py-2">
+                          {row.entradaQty.toFixed(1)} {row.material.unit}
+                        </td>
+                        <td className="px-4 py-2">R$ {row.entradaCost.toFixed(2)}</td>
+                        <td className="px-4 py-2">
+                          {row.saidaQty.toFixed(1)} {row.material.unit}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </section>
         </>
