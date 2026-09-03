@@ -9,6 +9,7 @@ import { MachineDetail } from './pages/MachineDetail'
 import { NewMaintenance } from './pages/NewMaintenance'
 import { NewFuelRecord } from './pages/NewFuelRecord'
 import { FuelDeliveries } from './pages/FuelDeliveries'
+import { Materials } from './pages/Materials'
 import { Reports } from './pages/Reports'
 import { Metrics } from './pages/Metrics'
 import { Users } from './pages/Users'
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/machines/:id/maintenance/new" element={<NewMaintenance />} />
             <Route path="/machines/:id/fuel/new" element={<NewFuelRecord />} />
             <Route path="/fuel-deliveries" element={<FuelDeliveries />} />
+            <Route path="/materials" element={<Materials />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/metrics" element={<Metrics />} />
             <Route path="/account" element={<Account />} />

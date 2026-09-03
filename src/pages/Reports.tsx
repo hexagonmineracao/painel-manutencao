@@ -207,6 +207,7 @@ export function Reports() {
                 </button>
               </div>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-500 border-b border-slate-100">
@@ -239,11 +240,12 @@ export function Reports() {
                 )}
               </tbody>
             </table>
+            </div>
           </section>
 
           <section className="bg-white border border-slate-200 rounded-lg px-4 py-3">
             <div className="font-medium text-slate-900 mb-2">Balanço do período</div>
-            <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div>
                 <p className="text-slate-500">Entrada</p>
                 <p className="text-slate-900 font-medium">{totalDeliveredLiters.toFixed(0)} L</p>
@@ -277,6 +279,7 @@ export function Reports() {
                 </button>
               </div>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-500 border-b border-slate-100">
@@ -307,6 +310,7 @@ export function Reports() {
                 )}
               </tbody>
             </table>
+            </div>
           </section>
 
           <section className="bg-white border border-slate-200 rounded-lg">
@@ -324,6 +328,7 @@ export function Reports() {
                 </button>
               </div>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-500 border-b border-slate-100">
@@ -350,6 +355,7 @@ export function Reports() {
                 )}
               </tbody>
             </table>
+            </div>
           </section>
         </>
       )}

@@ -71,3 +71,26 @@ export interface TankSettings {
   initial_date: string
   updated_at: string
 }
+
+export interface Material {
+  id: string
+  name: string
+  unit: string
+  min_stock: number | null
+  created_at: string
+}
+
+export type MaterialMovementType = 'entrada' | 'saida'
+
+export interface MaterialMovement {
+  id: string
+  material_id: string
+  machine_id: string | null
+  user_id: string
+  type: MaterialMovementType
+  quantity: number
+  cost: number | null
+  moved_at: string
+  notes: string | null
+  created_at: string
+}
