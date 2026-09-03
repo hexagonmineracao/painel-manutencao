@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { usernameToEmail } from '../lib/auth'
+import { HexMark } from '../components/HexMark'
 
 export function Login() {
   const { session, signIn } = useAuth()
@@ -34,8 +35,12 @@ export function Login() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm bg-white p-8 rounded-lg border border-slate-200 shadow-sm"
       >
-        <h1 className="text-lg font-semibold text-slate-900 mb-6">
-          Painel de Manutenção
+        <HexMark size={48} className="text-brand mx-auto mb-4" />
+        <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">
+          Hexagon Mineração
+        </p>
+        <h1 className="text-center text-xl font-semibold text-slate-900 mb-6">
+          Gestão Operacional
         </h1>
 
         <label className="block text-sm font-medium text-slate-700 mb-1">Usuário</label>
@@ -61,7 +66,7 @@ export function Login() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-slate-900 text-white text-sm font-medium py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
+          className="w-full bg-brand text-white text-sm font-medium py-2 rounded-md hover:bg-brand-dark disabled:opacity-50"
         >
           {submitting ? 'Entrando...' : 'Entrar'}
         </button>

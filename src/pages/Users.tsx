@@ -25,7 +25,7 @@ export function Users() {
         <h1 className="text-xl font-semibold text-slate-900">Usuários</h1>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="bg-slate-900 text-white text-sm font-medium px-3 py-2 rounded-md hover:bg-slate-800"
+          className="bg-brand text-white text-sm font-medium px-3 py-2 rounded-md hover:bg-brand-dark"
         >
           {showForm ? 'Cancelar' : 'Novo usuário'}
         </button>
@@ -110,7 +110,7 @@ function ResetPasswordForm({ userId, onDone }: { userId: string; onDone: () => v
       <button
         type="submit"
         disabled={submitting}
-        className="bg-slate-900 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-slate-800 disabled:opacity-50"
+        className="bg-brand text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-brand-dark disabled:opacity-50"
       >
         {submitting ? 'Salvando...' : 'Salvar'}
       </button>
@@ -200,7 +200,7 @@ function UserForm({ onCreated }: { onCreated: () => void }) {
         <button
           type="submit"
           disabled={submitting}
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
+          className="bg-brand text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-brand-dark disabled:opacity-50"
         >
           {submitting ? 'Criando...' : 'Criar'}
         </button>

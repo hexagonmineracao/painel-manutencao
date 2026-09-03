@@ -100,7 +100,7 @@ export function Dashboard() {
               onClick={() => setPeriod(opt)}
               className={`text-sm px-3 py-1.5 rounded-md border ${
                 period === opt
-                  ? 'bg-slate-900 text-white border-slate-900'
+                  ? 'bg-brand text-white border-brand'
                   : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
               }`}
             >

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { HexMark } from './HexMark'
 
 const links = [
   { to: '/', label: 'Dashboard' },
@@ -23,7 +24,7 @@ export function Layout() {
   }
 
   const navLinkClass =
-    'px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-100'
+    'px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-brand/8 hover:text-brand'
 
   const visibleLinks = profile?.role === 'admin' ? [...links, { to: '/users', label: 'Usuários' }] : links
 
@@ -32,8 +33,16 @@ export function Layout() {
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
           <div className="flex items-center gap-4 min-w-0">
-            <Link to="/" className="font-semibold text-slate-900 shrink-0">
-              Painel Manutenção
+            <Link to="/" className="flex items-center gap-2 shrink-0">
+              <HexMark size={24} className="text-brand shrink-0" />
+              <span className="leading-tight">
+                <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  Hexagon Mineração
+                </span>
+                <span className="block text-[15px] font-semibold text-slate-900">
+                  Gestão Operacional
+                </span>
+              </span>
             </Link>
             <nav className="hidden lg:flex items-center gap-1">
               {visibleLinks.map((link) => (

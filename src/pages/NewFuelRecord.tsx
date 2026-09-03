@@ -103,7 +103,7 @@ export function NewFuelRecord() {
         <button
           type="submit"
           disabled={submitting}
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 disabled:opacity-50"
+          className="bg-brand text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-brand-dark disabled:opacity-50"
         >
           {submitting ? 'Salvando...' : 'Salvar'}
         </button>

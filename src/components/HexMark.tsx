@@ -1,0 +1,23 @@
+// Marca hexagonal da Hexagon Mineração. Redesenho próprio (mesma posição/
+// proporção do logo oficial) até termos o arquivo original da empresa —
+// trocar por <img> apontando pro logo real assim que ele for enviado.
+export function HexMark({ size = 28, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 120 120"
+      className={className}
+      aria-hidden="true"
+    >
+      <g stroke="currentColor" strokeWidth="13" strokeLinecap="round">
+        <line x1="67.17" y1="18.14" x2="96.65" y2="35.16" />
+        <line x1="99.84" y1="45.28" x2="99.84" y2="79.32" />
+        <line x1="92.67" y1="87.14" x2="63.19" y2="104.16" />
+        <line x1="52.83" y1="101.86" x2="23.35" y2="84.84" />
+        <line x1="20.16" y1="74.72" x2="20.16" y2="40.68" />
+        <line x1="27.33" y1="32.86" x2="56.81" y2="15.84" />
+      </g>
+    </svg>
+  )
+}

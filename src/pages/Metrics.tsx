@@ -124,7 +124,7 @@ export function Metrics() {
         <h1 className="text-xl font-semibold text-slate-900">Métricas gerais</h1>
         <button
           onClick={handleExport}
-          className="bg-slate-900 text-white text-sm font-medium px-3 py-2 rounded-md hover:bg-slate-800"
+          className="bg-brand text-white text-sm font-medium px-3 py-2 rounded-md hover:bg-brand-dark"
         >
           Exportar CSV
         </button>
