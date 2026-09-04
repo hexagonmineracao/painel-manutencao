@@ -6,7 +6,7 @@ import { HexMark } from './HexMark'
 const links = [
   { to: '/', label: 'Dashboard' },
   { to: '/machines', label: 'Máquinas' },
-  { to: '/fuel-deliveries', label: 'Entrada de combustível' },
+  { to: '/fuel', label: 'Combustível' },
   { to: '/materials', label: 'Estoque' },
   { to: '/reports', label: 'Relatórios' },
   { to: '/metrics', label: 'Métricas' },

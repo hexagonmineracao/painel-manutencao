@@ -33,10 +33,21 @@ export interface MaintenanceRecord {
   created_at: string
 }
 
+export interface FuelType {
+  id: string
+  name: string
+  unit: string
+  min_stock: number | null
+  initial_liters: number
+  initial_date: string
+  created_at: string
+}
+
 export interface FuelRecord {
   id: string
   machine_id: string
   user_id: string
+  fuel_type_id: string
   recorded_at: string
   hourmeter: number
   liters: number
@@ -47,6 +58,7 @@ export interface FuelRecord {
 export interface FuelDelivery {
   id: string
   user_id: string
+  fuel_type_id: string
   delivered_at: string
   liters: number
   total_cost: number
@@ -63,13 +75,6 @@ export interface AlertDismissal {
   dismissed_by: string
   dismissed_at: string
   remind_at: string | null
-}
-
-export interface TankSettings {
-  id: number
-  initial_liters: number
-  initial_date: string
-  updated_at: string
 }
 
 export interface Material {

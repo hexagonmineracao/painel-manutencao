@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { MachineForm } from '../components/MachineForm'
-import type { FuelRecord, Machine, MaintenanceRecord, MaintenanceType } from '../lib/database.types'
+import type { FuelRecord, FuelType, Machine, MaintenanceRecord, MaintenanceType } from '../lib/database.types'
 
 type HistoryItem =
   | ({ kind: 'maintenance' } & MaintenanceRecord)
@@ -21,6 +21,7 @@ export function MachineDetail() {
   const navigate = useNavigate()
   const [machine, setMachine] = useState<Machine | null>(null)
   const [history, setHistory] = useState<HistoryItem[]>([])
+  const [fuelTypes, setFuelTypes] = useState<FuelType[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -29,7 +30,7 @@ export function MachineDetail() {
   async function load() {
     if (!id) return
     setLoading(true)
-    const [machineRes, maintenanceRes, fuelRes] = await Promise.all([
+    const [machineRes, maintenanceRes, fuelRes, fuelTypesRes] = await Promise.all([
       supabase.from('machines').select('*').eq('id', id).returns<Machine[]>().single(),
       supabase
         .from('maintenance_records')
@@ -43,9 +44,11 @@ export function MachineDetail() {
         .eq('machine_id', id)
         .order('recorded_at', { ascending: false })
         .returns<FuelRecord[]>(),
+      supabase.from('fuel_types').select('*').order('name').returns<FuelType[]>(),
     ])
 
     setMachine(machineRes.data)
+    setFuelTypes(fuelTypesRes.data ?? [])
 
     const maintenanceItems: HistoryItem[] = (maintenanceRes.data ?? []).map((r) => ({
       kind: 'maintenance',
@@ -179,6 +182,7 @@ export function MachineDetail() {
                   ) : (
                     <FuelEditForm
                       item={item}
+                      fuelTypes={fuelTypes}
                       onSaved={() => {
                         setEditingItem(null)
                         load()
@@ -226,7 +230,11 @@ export function MachineDetail() {
                 ) : (
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-medium text-slate-900">Abastecimento</p>
+                      <p className="font-medium text-slate-900">
+                        Abastecimento
+                        {fuelTypes.find((t) => t.id === item.fuel_type_id) &&
+                          ` — ${fuelTypes.find((t) => t.id === item.fuel_type_id)?.name}`}
+                      </p>
                       <p className="text-slate-500">
                         {new Date(item.recorded_at).toLocaleString('pt-BR')} · horímetro{' '}
                         {item.hourmeter} h · {item.liters} L
@@ -392,13 +400,16 @@ function MaintenanceEditForm({
 
 function FuelEditForm({
   item,
+  fuelTypes,
   onSaved,
   onCancel,
 }: {
   item: FuelRecord
+  fuelTypes: FuelType[]
   onSaved: () => void
   onCancel: () => void
 }) {
+  const [fuelTypeId, setFuelTypeId] = useState(item.fuel_type_id)
   const [recordedAt, setRecordedAt] = useState(toInputValue(item.recorded_at))
   const [hourmeter, setHourmeter] = useState(String(item.hourmeter))
   const [liters, setLiters] = useState(String(item.liters))
@@ -413,6 +424,7 @@ function FuelEditForm({
     const { error } = await supabase
       .from('fuel_records')
       .update({
+        fuel_type_id: fuelTypeId,
         recorded_at: new Date(recordedAt).toISOString(),
         hourmeter: Number(hourmeter),
         liters: Number(liters),
@@ -429,6 +441,21 @@ function FuelEditForm({
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Combustível</label>
+        <select
+          required
+          value={fuelTypeId}
+          onChange={(e) => setFuelTypeId(e.target.value)}
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        >
+          {fuelTypes.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div>
         <label className="block text-xs font-medium text-slate-700 mb-1">Data e hora</label>
         <input

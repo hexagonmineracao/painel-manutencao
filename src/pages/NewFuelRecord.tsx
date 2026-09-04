@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabaseClient'
+import type { FuelType } from '../lib/database.types'
 
 function nowForInput() {
   const now = new Date()
@@ -14,12 +15,26 @@ export function NewFuelRecord() {
   const { session } = useAuth()
   const navigate = useNavigate()
 
+  const [fuelTypes, setFuelTypes] = useState<FuelType[]>([])
+  const [fuelTypeId, setFuelTypeId] = useState('')
   const [recordedAt, setRecordedAt] = useState(nowForInput())
   const [hourmeter, setHourmeter] = useState('')
   const [liters, setLiters] = useState('')
   const [cost, setCost] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    supabase
+      .from('fuel_types')
+      .select('*')
+      .order('name')
+      .returns<FuelType[]>()
+      .then(({ data }) => {
+        setFuelTypes(data ?? [])
+        if (data && data.length === 1) setFuelTypeId(data[0].id)
+      })
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -30,6 +45,7 @@ export function NewFuelRecord() {
     const { error } = await supabase.from('fuel_records').insert({
       machine_id: id,
       user_id: session.user.id,
+      fuel_type_id: fuelTypeId,
       recorded_at: new Date(recordedAt).toISOString(),
       hourmeter: Number(hourmeter),
       liters: Number(liters),
@@ -52,6 +68,25 @@ export function NewFuelRecord() {
       <h1 className="text-xl font-semibold text-slate-900">Registrar abastecimento</h1>
 
       <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Combustível</label>
+          <select
+            required
+            value={fuelTypeId}
+            onChange={(e) => setFuelTypeId(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="" disabled>
+              Selecione...
+            </option>
+            {fuelTypes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Data e hora</label>
           <input
@@ -76,7 +111,7 @@ export function NewFuelRecord() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Combustível (litros)</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Quantidade (litros)</label>
           <input
             type="number"
             step="0.01"

@@ -17,6 +17,9 @@ export function MachineForm({
   const [interval, setInterval] = useState(
     initial?.maintenance_interval_hours != null ? String(initial.maintenance_interval_hours) : '',
   )
+  const [hourmeter, setHourmeter] = useState(
+    initial ? String(initial.current_hourmeter) : '0',
+  )
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -30,6 +33,7 @@ export function MachineForm({
       name,
       number,
       maintenance_interval_hours: interval ? Number(interval) : null,
+      current_hourmeter: Number(hourmeter),
     }
 
     const { error } = initial
@@ -88,8 +92,25 @@ export function MachineForm({
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">
+          {initial ? 'Horímetro atual (h)' : 'Horímetro inicial (h)'}
+        </label>
+        <input
+          type="number"
+          step="0.1"
+          required
+          value={hourmeter}
+          onChange={(e) => setHourmeter(e.target.value)}
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </div>
       <p className="text-xs text-slate-400 sm:col-span-4">
-        Usado só quando o mecânico não informa "próximo horímetro previsto" ao registrar a manutenção.
+        {initial
+          ? 'Corrija aqui só se o horímetro real estiver diferente do sistema — o normal é ele atualizar sozinho a partir dos abastecimentos/manutenções registrados.'
+          : 'Quanto o horímetro já marca hoje, se a máquina não for zero-km no sistema.'}{' '}
+        O intervalo padrão é usado só quando o mecânico não informa "próximo horímetro previsto" ao
+        registrar a manutenção.
       </p>
       {error && <p className="text-sm text-red-600 sm:col-span-4">{error}</p>}
       <div className="sm:col-span-4 flex items-center gap-2">
