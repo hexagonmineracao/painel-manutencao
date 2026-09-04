@@ -1,22 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabaseClient'
+import { matchesSearch, normalize } from '../lib/search'
 import type { Machine, Material, MaterialMovement, MaterialMovementType } from '../lib/database.types'
-
-// Remove acentos (via NFD + descarte dos diacríticos combinantes) pra
-// "Oleo" encontrar "Óleo" na busca de duplicidade.
-function normalize(s: string) {
-  return s
-    .normalize('NFD')
-    .split('')
-    .filter((ch) => {
-      const code = ch.codePointAt(0) ?? 0
-      return !(code >= 0x0300 && code <= 0x036f)
-    })
-    .join('')
-    .toLowerCase()
-    .trim()
-}
 
 function nowForInput() {
   const now = new Date()
@@ -39,6 +25,7 @@ export function Materials() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   async function load() {
     setLoading(true)
@@ -60,6 +47,8 @@ export function Materials() {
   useEffect(() => {
     load()
   }, [])
+
+  const filteredMaterials = materials.filter((m) => matchesSearch(search, m.name))
 
   function balanceFor(materialId: string) {
     return movements
@@ -109,13 +98,22 @@ export function Materials() {
         />
       )}
 
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Buscar material..."
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+      />
+
       {loading ? (
         <p className="text-slate-500">Carregando...</p>
       ) : materials.length === 0 ? (
         <p className="text-slate-500">Nenhum material cadastrado.</p>
+      ) : filteredMaterials.length === 0 ? (
+        <p className="text-slate-500">Nenhum material encontrado para "{search}".</p>
       ) : (
         <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-          {materials.map((mat) => {
+          {filteredMaterials.map((mat) => {
             const balance = balanceFor(mat.id)
             const low = mat.min_stock != null && balance < mat.min_stock
             return (

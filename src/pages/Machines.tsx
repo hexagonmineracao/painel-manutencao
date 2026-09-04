@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { MachineForm } from '../components/MachineForm'
+import { matchesSearch } from '../lib/search'
 import type { Machine } from '../lib/database.types'
 
 export function Machines() {
   const [machines, setMachines] = useState<Machine[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [search, setSearch] = useState('')
 
   async function load() {
     setLoading(true)
@@ -19,6 +21,8 @@ export function Machines() {
   useEffect(() => {
     load()
   }, [])
+
+  const filtered = machines.filter((m) => matchesSearch(search, m.name, m.model, m.number))
 
   return (
     <div className="space-y-6">
@@ -41,13 +45,22 @@ export function Machines() {
         />
       )}
 
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Buscar por nome, modelo ou número..."
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+      />
+
       {loading ? (
         <p className="text-slate-500">Carregando...</p>
       ) : machines.length === 0 ? (
         <p className="text-slate-500">Nenhuma máquina cadastrada.</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-slate-500">Nenhuma máquina encontrada para "{search}".</p>
       ) : (
         <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-          {machines.map((m) => (
+          {filtered.map((m) => (
             <Link
               key={m.id}
               to={`/machines/${m.id}`}
