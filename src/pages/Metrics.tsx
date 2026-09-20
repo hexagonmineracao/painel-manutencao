@@ -105,9 +105,10 @@ export function Metrics() {
   function handleExport() {
     exportToCsv(
       `metricas_${from}_a_${to}`,
-      ['Máquina', 'Horas trabalhadas', 'Litros', 'Custo combustível', 'Custo manutenção', 'Custo total', 'Custo/hora'],
+      ['Máquina', 'Modelo', 'Horas trabalhadas', 'Litros', 'Custo combustível', 'Custo manutenção', 'Custo total', 'Custo/hora'],
       visibleRows.map((r) => [
         r.machine.name,
+        r.machine.model,
         r.hours != null ? r.hours.toFixed(0) : '',
         r.liters.toFixed(1),
         r.fuelCost.toFixed(2),
@@ -160,7 +161,7 @@ export function Metrics() {
               return (
                 <label key={m.id} className="flex items-center gap-1.5 text-sm text-slate-700">
                   <input type="checkbox" checked={checked} onChange={() => toggleMachine(m.id)} />
-                  {m.name}
+                  {m.name} <span className="text-slate-400">({m.model})</span>
                 </label>
               )
             })}
@@ -176,6 +177,7 @@ export function Metrics() {
             <thead>
               <tr className="text-left text-slate-500 border-b border-slate-100">
                 <th className="px-4 py-2 font-medium">Máquina</th>
+                <th className="px-4 py-2 font-medium">Modelo</th>
                 <th className="px-4 py-2 font-medium">Horas trabalhadas</th>
                 <th className="px-4 py-2 font-medium">Litros</th>
                 <th className="px-4 py-2 font-medium">Custo combustível</th>
@@ -187,7 +189,7 @@ export function Metrics() {
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-slate-500">
+                  <td colSpan={8} className="px-4 py-4 text-slate-500">
                     Sem dados no período.
                   </td>
                 </tr>
@@ -195,6 +197,7 @@ export function Metrics() {
                 visibleRows.map((r) => (
                   <tr key={r.machine.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-2 text-slate-900">{r.machine.name}</td>
+                    <td className="px-4 py-2 text-slate-500">{r.machine.model}</td>
                     <td className="px-4 py-2">{r.hours != null ? `${r.hours.toFixed(0)} h` : '—'}</td>
                     <td className="px-4 py-2">{r.liters.toFixed(1)} L</td>
                     <td className="px-4 py-2">R$ {r.fuelCost.toFixed(2)}</td>
