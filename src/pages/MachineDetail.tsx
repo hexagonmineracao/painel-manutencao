@@ -9,10 +9,29 @@ type HistoryItem =
   | ({ kind: 'maintenance' } & MaintenanceRecord)
   | ({ kind: 'fuel' } & FuelRecord)
 
+type PeriodOption = '7' | '14' | '30' | 'custom'
+
 function toInputValue(iso: string) {
   const d = new Date(iso)
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
   return d.toISOString().slice(0, 16)
+}
+
+function daysAgoInput(days: number) {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
+
+function todayInput() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+const periodLabels: Record<PeriodOption, string> = {
+  '7': 'Últimos 7 dias',
+  '14': 'Últimos 14 dias',
+  '30': 'Último mês',
+  custom: 'Período personalizado',
 }
 
 export function MachineDetail() {
@@ -26,6 +45,9 @@ export function MachineDetail() {
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [editingItem, setEditingItem] = useState<HistoryItem | null>(null)
+  const [period, setPeriod] = useState<PeriodOption>('30')
+  const [customFrom, setCustomFrom] = useState(daysAgoInput(30))
+  const [customTo, setCustomTo] = useState(todayInput())
 
   async function load() {
     if (!id) return
@@ -100,6 +122,21 @@ export function MachineDetail() {
   if (loading) return <p className="text-slate-500">Carregando...</p>
   if (!machine) return <p className="text-slate-500">Máquina não encontrada.</p>
 
+  const from = period === 'custom' ? customFrom : daysAgoInput(Number(period))
+  const to = period === 'custom' ? customTo : todayInput()
+  const fromISO = new Date(from + 'T00:00:00').toISOString()
+  const toISO = new Date(to + 'T23:59:59').toISOString()
+
+  const periodFuelItems = history.filter(
+    (item): item is { kind: 'fuel' } & FuelRecord =>
+      item.kind === 'fuel' && item.recorded_at >= fromISO && item.recorded_at <= toISO,
+  )
+  const periodLiters = periodFuelItems.reduce((sum, r) => sum + Number(r.liters), 0)
+  const periodCost = periodFuelItems.reduce((sum, r) => sum + Number(r.cost ?? 0), 0)
+  const periodHourmeters = periodFuelItems.map((r) => Number(r.hourmeter))
+  const periodHours = periodHourmeters.length >= 2 ? Math.max(...periodHourmeters) - Math.min(...periodHourmeters) : null
+  const periodLitersPerHour = periodHours != null && periodHours > 0 ? periodLiters / periodHours : null
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -141,6 +178,68 @@ export function MachineDetail() {
           onCancel={() => setEditing(false)}
         />
       )}
+
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <p className="text-sm font-medium text-slate-900">Resumo do período</p>
+          <div className="flex items-center gap-2">
+            {(['7', '14', '30', 'custom'] as PeriodOption[]).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setPeriod(opt)}
+                className={`text-sm px-3 py-1.5 rounded-md border ${
+                  period === opt
+                    ? 'bg-brand text-white border-brand'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {opt === 'custom' ? 'Personalizado' : `${opt} dias`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {period === 'custom' && (
+          <div className="flex items-end gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">De</label>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Até</label>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+          <SummaryCard
+            label="Litros abastecidos"
+            value={`${periodLiters.toFixed(1)} L`}
+            sub={periodLabels[period]}
+          />
+          <SummaryCard
+            label="Horas trabalhadas"
+            value={periodHours != null ? `${periodHours.toFixed(1)} h` : '—'}
+            sub={periodHours != null ? periodLabels[period] : 'Precisa de 2+ abastecimentos no período'}
+          />
+          <SummaryCard
+            label="Consumo médio"
+            value={periodLitersPerHour != null ? `${periodLitersPerHour.toFixed(2)} L/h` : '—'}
+            sub={periodCost > 0 ? `R$ ${periodCost.toFixed(2)} em combustível` : periodLabels[period]}
+          />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Link
@@ -270,6 +369,16 @@ export function MachineDetail() {
           </ul>
         )}
       </div>
+    </div>
+  )
+}
+
+function SummaryCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-xl font-semibold text-slate-900">{value}</p>
+      <p className="text-xs text-slate-400">{sub}</p>
     </div>
   )
 }
