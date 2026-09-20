@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import type { Machine } from '../lib/database.types'
+import type { Machine, MachineGroup } from '../lib/database.types'
 
 export function MachineForm({
   initial,
@@ -20,8 +20,19 @@ export function MachineForm({
   const [hourmeter, setHourmeter] = useState(
     initial ? String(initial.current_hourmeter) : '0',
   )
+  const [groupId, setGroupId] = useState(initial?.group_id ?? '')
+  const [groups, setGroups] = useState<MachineGroup[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    supabase
+      .from('machine_groups')
+      .select('*')
+      .order('name')
+      .returns<MachineGroup[]>()
+      .then(({ data }) => setGroups(data ?? []))
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -34,6 +45,7 @@ export function MachineForm({
       number,
       maintenance_interval_hours: interval ? Number(interval) : null,
       current_hourmeter: Number(hourmeter),
+      group_id: groupId || null,
     }
 
     const { error } = initial
@@ -83,6 +95,21 @@ export function MachineForm({
         />
       </div>
       <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Grupo (opcional)</label>
+        <select
+          value={groupId}
+          onChange={(e) => setGroupId(e.target.value)}
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">Sem grupo</option>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
         <label className="block text-xs font-medium text-slate-700 mb-1">Intervalo padrão (h)</label>
         <input
           type="number"
@@ -107,10 +134,10 @@ export function MachineForm({
       </div>
       <p className="text-xs text-slate-400 sm:col-span-4">
         {initial
-          ? 'Corrija aqui só se o horímetro real estiver diferente do sistema — o normal é ele atualizar sozinho a partir dos abastecimentos/manutenções registrados.'
+          ? 'Corrija o horímetro aqui só se o valor real estiver diferente do sistema — o normal é ele atualizar sozinho a partir dos abastecimentos/manutenções registrados.'
           : 'Quanto o horímetro já marca hoje, se a máquina não for zero-km no sistema.'}{' '}
         O intervalo padrão é usado só quando o mecânico não informa "próximo horímetro previsto" ao
-        registrar a manutenção.
+        registrar a manutenção. Novos grupos são cadastrados pelo admin na aba Máquinas.
       </p>
       {error && <p className="text-sm text-red-600 sm:col-span-4">{error}</p>}
       <div className="sm:col-span-4 flex items-center gap-2">

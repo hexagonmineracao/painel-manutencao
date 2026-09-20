@@ -513,10 +513,42 @@ function DeliveryForm({
   )
   const [liters, setLiters] = useState(initial ? String(initial.liters) : '')
   const [totalCost, setTotalCost] = useState(initial ? String(initial.total_cost) : '')
+  const [pricePerLiter, setPricePerLiter] = useState(
+    initial && Number(initial.liters) > 0
+      ? (Number(initial.total_cost) / Number(initial.liters)).toFixed(3)
+      : '',
+  )
   const [supplier, setSupplier] = useState(initial?.supplier ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  function handleLitersChange(v: string) {
+    setLiters(v)
+    const l = Number(v)
+    const p = Number(pricePerLiter)
+    if (v && pricePerLiter && !isNaN(l) && !isNaN(p)) {
+      setTotalCost((l * p).toFixed(2))
+    }
+  }
+
+  function handlePricePerLiterChange(v: string) {
+    setPricePerLiter(v)
+    const l = Number(liters)
+    const p = Number(v)
+    if (liters && v && !isNaN(l) && !isNaN(p)) {
+      setTotalCost((l * p).toFixed(2))
+    }
+  }
+
+  function handleTotalCostChange(v: string) {
+    setTotalCost(v)
+    const l = Number(liters)
+    const t = Number(v)
+    if (liters && l > 0 && v && !isNaN(l) && !isNaN(t)) {
+      setPricePerLiter((t / l).toFixed(3))
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -568,7 +600,18 @@ function DeliveryForm({
           step="0.01"
           required
           value={liters}
-          onChange={(e) => setLiters(e.target.value)}
+          onChange={(e) => handleLitersChange(e.target.value)}
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-700 mb-1">Preço por litro (R$)</label>
+        <input
+          type="number"
+          step="0.001"
+          value={pricePerLiter}
+          onChange={(e) => handlePricePerLiterChange(e.target.value)}
+          placeholder="Opcional"
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
@@ -579,10 +622,13 @@ function DeliveryForm({
           step="0.01"
           required
           value={totalCost}
-          onChange={(e) => setTotalCost(e.target.value)}
+          onChange={(e) => handleTotalCostChange(e.target.value)}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
+      <p className="text-xs text-slate-400 sm:col-span-2">
+        Preenche litros e um dos dois (preço/L ou valor total) — o outro calcula sozinho.
+      </p>
       <div>
         <label className="block text-xs font-medium text-slate-700 mb-1">Fornecedor (opcional)</label>
         <input

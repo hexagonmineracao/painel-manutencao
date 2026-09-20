@@ -6,6 +6,7 @@ import type {
   FuelRecord,
   FuelType,
   Machine,
+  MachineGroup,
   MaintenanceRecord,
   Material,
   MaterialMovement,
@@ -53,13 +54,11 @@ interface FuelTypeRow {
 export function Reports() {
   const [from, setFrom] = useState(daysAgoInput(30))
   const [to, setTo] = useState(todayInput())
+  const [groupFilter, setGroupFilter] = useState('')
+  const [groups, setGroups] = useState<MachineGroup[]>([])
   const [loading, setLoading] = useState(true)
-  const [fuelRows, setFuelRows] = useState<FuelRow[]>([])
-  const [maintenanceRows, setMaintenanceRows] = useState<MaintenanceRow[]>([])
   const [deliveries, setDeliveries] = useState<FuelDelivery[]>([])
   const [fuelTypes, setFuelTypes] = useState<FuelType[]>([])
-  const [fuelTypeRows, setFuelTypeRows] = useState<FuelTypeRow[]>([])
-  const [materialRows, setMaterialRows] = useState<MaterialRow[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
   const [materialMovements, setMaterialMovements] = useState<MaterialMovement[]>([])
@@ -75,6 +74,7 @@ export function Reports() {
 
       const [
         machinesRes,
+        groupsRes,
         fuelRes,
         maintenanceRes,
         deliveriesRes,
@@ -84,6 +84,7 @@ export function Reports() {
         profilesRes,
       ] = await Promise.all([
           supabase.from('machines').select('*').order('name').returns<Machine[]>(),
+          supabase.from('machine_groups').select('*').order('name').returns<MachineGroup[]>(),
           supabase
             .from('fuel_records')
             .select('*')
@@ -114,109 +115,108 @@ export function Reports() {
           supabase.from('profiles').select('*').returns<Profile[]>(),
         ])
 
-      const machines = machinesRes.data ?? []
-      setMachinesList(machines)
-      const fuel = fuelRes.data ?? []
-      setFuelRecords(fuel)
-      const maintenance = maintenanceRes.data ?? []
-      setMaintenanceRecords(maintenance)
-      const deliveries = deliveriesRes.data ?? []
-      setDeliveries(deliveries)
+      setMachinesList(machinesRes.data ?? [])
+      setGroups(groupsRes.data ?? [])
+      setFuelRecords(fuelRes.data ?? [])
+      setMaintenanceRecords(maintenanceRes.data ?? [])
+      setDeliveries(deliveriesRes.data ?? [])
       setProfiles(profilesRes.data ?? [])
-
-      const types = fuelTypesRes.data ?? []
-      setFuelTypes(types)
-      const computedFuelTypeRows: FuelTypeRow[] = types
-        .map((fuelType) => {
-          const entradas = deliveries.filter((d) => d.fuel_type_id === fuelType.id)
-          const saidas = fuel.filter((r) => r.fuel_type_id === fuelType.id)
-          if (entradas.length === 0 && saidas.length === 0) return null
-          return {
-            fuelType,
-            entradaQty: entradas.reduce((s, d) => s + Number(d.liters), 0),
-            entradaCost: entradas.reduce((s, d) => s + Number(d.total_cost), 0),
-            saidaQty: saidas.reduce((s, r) => s + Number(r.liters), 0),
-          }
-        })
-        .filter((r): r is FuelTypeRow => r !== null)
-      setFuelTypeRows(computedFuelTypeRows)
-
-      const materials = materialsRes.data ?? []
-      setMaterials(materials)
-      const movements = movementsRes.data ?? []
-      setMaterialMovements(movements)
-      const movementsByMaterial = new Map<string, MaterialMovement[]>()
-      for (const mv of movements) {
-        const list = movementsByMaterial.get(mv.material_id) ?? []
-        list.push(mv)
-        movementsByMaterial.set(mv.material_id, list)
-      }
-      const computedMaterialRows: MaterialRow[] = materials
-        .map((material) => {
-          const recs = movementsByMaterial.get(material.id) ?? []
-          if (recs.length === 0) return null
-          const entradas = recs.filter((r) => r.type === 'entrada')
-          const saidas = recs.filter((r) => r.type === 'saida')
-          return {
-            material,
-            entradaQty: entradas.reduce((s, r) => s + Number(r.quantity), 0),
-            entradaCost: entradas.reduce((s, r) => s + Number(r.cost ?? 0), 0),
-            saidaQty: saidas.reduce((s, r) => s + Number(r.quantity), 0),
-          }
-        })
-        .filter((r): r is MaterialRow => r !== null)
-      setMaterialRows(computedMaterialRows)
-
-      const fuelByMachine = new Map<string, FuelRecord[]>()
-      for (const rec of fuel) {
-        const list = fuelByMachine.get(rec.machine_id) ?? []
-        list.push(rec)
-        fuelByMachine.set(rec.machine_id, list)
-      }
-
-      const computedFuelRows: FuelRow[] = machines
-        .map((machine) => {
-          const records = fuelByMachine.get(machine.id) ?? []
-          if (records.length === 0) return null
-          const liters = records.reduce((sum, r) => sum + Number(r.liters), 0)
-          const cost = records.reduce((sum, r) => sum + Number(r.cost ?? 0), 0)
-          const hourmeters = records.map((r) => Number(r.hourmeter))
-          const hours = Math.max(...hourmeters) - Math.min(...hourmeters)
-          return {
-            machine,
-            liters,
-            cost,
-            hours,
-            litersPerHour: hours > 0 ? liters / hours : null,
-          }
-        })
-        .filter((r): r is FuelRow => r !== null)
-
-      const maintenanceByMachine = new Map<string, MaintenanceRecord[]>()
-      for (const rec of maintenance) {
-        const list = maintenanceByMachine.get(rec.machine_id) ?? []
-        list.push(rec)
-        maintenanceByMachine.set(rec.machine_id, list)
-      }
-
-      const computedMaintenanceRows: MaintenanceRow[] = machines
-        .map((machine) => {
-          const records = maintenanceByMachine.get(machine.id) ?? []
-          if (records.length === 0) return null
-          return {
-            machine,
-            count: records.length,
-            cost: records.reduce((sum, r) => sum + Number(r.cost ?? 0), 0),
-          }
-        })
-        .filter((r): r is MaintenanceRow => r !== null)
-
-      setFuelRows(computedFuelRows)
-      setMaintenanceRows(computedMaintenanceRows)
+      setFuelTypes(fuelTypesRes.data ?? [])
+      setMaterials(materialsRes.data ?? [])
+      setMaterialMovements(movementsRes.data ?? [])
       setLoading(false)
     }
     load()
   }, [from, to])
+
+  // Máquinas dentro do grupo selecionado (ou todas, se nenhum grupo escolhido).
+  const scopedMachines = groupFilter ? machinesList.filter((m) => m.group_id === groupFilter) : machinesList
+  const scopedMachineIds = new Set(scopedMachines.map((m) => m.id))
+  const inGroup = (machineId: string | null) => !groupFilter || (machineId != null && scopedMachineIds.has(machineId))
+
+  const visibleFuelRecords = fuelRecords.filter((r) => inGroup(r.machine_id))
+  const visibleMaintenanceRecords = maintenanceRecords.filter((r) => inGroup(r.machine_id))
+  // Movimentação de estoque sem máquina vinculada não é afetada pelo filtro de grupo.
+  const visibleMaterialMovements = materialMovements.filter(
+    (m) => !groupFilter || m.machine_id == null || scopedMachineIds.has(m.machine_id),
+  )
+
+  const fuelByMachine = new Map<string, FuelRecord[]>()
+  for (const rec of visibleFuelRecords) {
+    const list = fuelByMachine.get(rec.machine_id) ?? []
+    list.push(rec)
+    fuelByMachine.set(rec.machine_id, list)
+  }
+  const fuelRows: FuelRow[] = scopedMachines
+    .map((machine) => {
+      const records = fuelByMachine.get(machine.id) ?? []
+      if (records.length === 0) return null
+      const liters = records.reduce((sum, r) => sum + Number(r.liters), 0)
+      const cost = records.reduce((sum, r) => sum + Number(r.cost ?? 0), 0)
+      const hourmeters = records.map((r) => Number(r.hourmeter))
+      const hours = Math.max(...hourmeters) - Math.min(...hourmeters)
+      return {
+        machine,
+        liters,
+        cost,
+        hours,
+        litersPerHour: hours > 0 ? liters / hours : null,
+      }
+    })
+    .filter((r): r is FuelRow => r !== null)
+
+  const maintenanceByMachine = new Map<string, MaintenanceRecord[]>()
+  for (const rec of visibleMaintenanceRecords) {
+    const list = maintenanceByMachine.get(rec.machine_id) ?? []
+    list.push(rec)
+    maintenanceByMachine.set(rec.machine_id, list)
+  }
+  const maintenanceRows: MaintenanceRow[] = scopedMachines
+    .map((machine) => {
+      const records = maintenanceByMachine.get(machine.id) ?? []
+      if (records.length === 0) return null
+      return {
+        machine,
+        count: records.length,
+        cost: records.reduce((sum, r) => sum + Number(r.cost ?? 0), 0),
+      }
+    })
+    .filter((r): r is MaintenanceRow => r !== null)
+
+  const fuelTypeRows: FuelTypeRow[] = fuelTypes
+    .map((fuelType) => {
+      const entradas = deliveries.filter((d) => d.fuel_type_id === fuelType.id)
+      const saidas = fuelRecords.filter((r) => r.fuel_type_id === fuelType.id)
+      if (entradas.length === 0 && saidas.length === 0) return null
+      return {
+        fuelType,
+        entradaQty: entradas.reduce((s, d) => s + Number(d.liters), 0),
+        entradaCost: entradas.reduce((s, d) => s + Number(d.total_cost), 0),
+        saidaQty: saidas.reduce((s, r) => s + Number(r.liters), 0),
+      }
+    })
+    .filter((r): r is FuelTypeRow => r !== null)
+
+  const movementsByMaterial = new Map<string, MaterialMovement[]>()
+  for (const mv of materialMovements) {
+    const list = movementsByMaterial.get(mv.material_id) ?? []
+    list.push(mv)
+    movementsByMaterial.set(mv.material_id, list)
+  }
+  const materialRows: MaterialRow[] = materials
+    .map((material) => {
+      const recs = movementsByMaterial.get(material.id) ?? []
+      if (recs.length === 0) return null
+      const entradas = recs.filter((r) => r.type === 'entrada')
+      const saidas = recs.filter((r) => r.type === 'saida')
+      return {
+        material,
+        entradaQty: entradas.reduce((s, r) => s + Number(r.quantity), 0),
+        entradaCost: entradas.reduce((s, r) => s + Number(r.cost ?? 0), 0),
+        saidaQty: saidas.reduce((s, r) => s + Number(r.quantity), 0),
+      }
+    })
+    .filter((r): r is MaterialRow => r !== null)
 
   const totalLiters = fuelRows.reduce((s, r) => s + r.liters, 0)
   const totalFuelCost = fuelRows.reduce((s, r) => s + r.cost, 0)
@@ -264,7 +264,7 @@ export function Reports() {
     exportToCsv(
       `abastecimentos_${from}_a_${to}`,
       ['Máquina', 'Combustível', 'Data/hora', 'Horímetro', 'Litros', 'Custo', 'Usuário'],
-      fuelRecords.map((r) => [
+      visibleFuelRecords.map((r) => [
         machineName(r.machine_id),
         fuelTypeName(r.fuel_type_id),
         new Date(r.recorded_at).toLocaleString('pt-BR'),
@@ -280,7 +280,7 @@ export function Reports() {
     exportToCsv(
       `movimentacoes_estoque_${from}_a_${to}`,
       ['Material', 'Tipo', 'Data/hora', 'Quantidade', 'Máquina', 'Usuário'],
-      materialMovements.map((m) => [
+      visibleMaterialMovements.map((m) => [
         materialName(m.material_id),
         m.type === 'entrada' ? 'Entrada' : 'Saída',
         new Date(m.moved_at).toLocaleString('pt-BR'),
@@ -295,7 +295,7 @@ export function Reports() {
     exportToCsv(
       `manutencoes_${from}_a_${to}`,
       ['Máquina', 'Tipo', 'Descrição', 'Data/hora', 'Horímetro', 'Custo', 'Usuário'],
-      maintenanceRecords.map((r) => [
+      visibleMaintenanceRecords.map((r) => [
         machineName(r.machine_id),
         r.type,
         r.description,
@@ -377,7 +377,25 @@ export function Reports() {
             className="rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">Grupo</label>
+          <select
+            value={groupFilter}
+            onChange={(e) => setGroupFilter(e.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">Todos os grupos</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+      <p className="text-xs text-slate-400 -mt-3">
+        O filtro de grupo se aplica às seções por máquina (combustível, abastecimentos, manutenções).
+      </p>
 
       {loading ? (
         <p className="text-slate-500">Carregando...</p>
@@ -507,14 +525,14 @@ export function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {fuelRecords.length === 0 ? (
+                  {visibleFuelRecords.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-4 text-slate-500">
                         Sem abastecimentos no período.
                       </td>
                     </tr>
                   ) : (
-                    fuelRecords
+                    visibleFuelRecords
                       .slice()
                       .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())
                       .map((r) => (
@@ -648,14 +666,14 @@ export function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {maintenanceRecords.length === 0 ? (
+                  {visibleMaintenanceRecords.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-4 text-slate-500">
                         Sem manutenções no período.
                       </td>
                     </tr>
                   ) : (
-                    maintenanceRecords
+                    visibleMaintenanceRecords
                       .slice()
                       .sort((a, b) => new Date(b.performed_at).getTime() - new Date(a.performed_at).getTime())
                       .map((r) => (
@@ -740,14 +758,14 @@ export function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {materialMovements.length === 0 ? (
+                  {visibleMaterialMovements.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-4 text-slate-500">
                         Sem movimentações no período.
                       </td>
                     </tr>
                   ) : (
-                    materialMovements
+                    visibleMaterialMovements
                       .slice()
                       .sort((a, b) => new Date(b.moved_at).getTime() - new Date(a.moved_at).getTime())
                       .map((m) => (

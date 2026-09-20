@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { Alerts } from '../components/Alerts'
+import type { FuelType } from '../lib/database.types'
 
 type PeriodOption = '7' | '14' | '30' | 'custom'
 
@@ -27,12 +28,10 @@ export function Dashboard() {
   const [customTo, setCustomTo] = useState(todayInput())
 
   const [loading, setLoading] = useState(true)
-  const [fuelCost, setFuelCost] = useState(0)
   const [fuelLiters, setFuelLiters] = useState(0)
-  const [deliveredLiters, setDeliveredLiters] = useState(0)
-  const [deliveredCost, setDeliveredCost] = useState(0)
-  const [maintenanceCost, setMaintenanceCost] = useState(0)
-  const [maintenanceCount, setMaintenanceCount] = useState(0)
+  const [dieselStock, setDieselStock] = useState<number | null>(null)
+  const [dieselUnit, setDieselUnit] = useState('L')
+  const [hasDiesel, setHasDiesel] = useState(true)
 
   const from = period === 'custom' ? customFrom : daysAgoInput(Number(period))
   const to = period === 'custom' ? customTo : todayInput()
@@ -51,38 +50,50 @@ export function Dashboard() {
       const fromISO = new Date(from + 'T00:00:00').toISOString()
       const toISO = new Date(to + 'T23:59:59').toISOString()
 
-      const [fuelRes, deliveriesRes, maintenanceRes] = await Promise.all([
+      const [fuelRes, dieselTypeRes] = await Promise.all([
         supabase
           .from('fuel_records')
-          .select('liters, cost')
+          .select('liters')
           .gte('recorded_at', fromISO)
           .lte('recorded_at', toISO)
-          .returns<Array<{ liters: number; cost: number | null }>>(),
+          .returns<Array<{ liters: number }>>(),
         supabase
-          .from('fuel_deliveries')
-          .select('liters, total_cost')
-          .gte('delivered_at', fromISO)
-          .lte('delivered_at', toISO)
-          .returns<Array<{ liters: number; total_cost: number }>>(),
-        supabase
-          .from('maintenance_records')
-          .select('cost')
-          .gte('performed_at', fromISO)
-          .lte('performed_at', toISO)
-          .returns<Array<{ cost: number | null }>>(),
+          .from('fuel_types')
+          .select('*')
+          .ilike('name', 'diesel%')
+          .limit(1)
+          .returns<FuelType[]>(),
       ])
 
       const fuel = fuelRes.data ?? []
       setFuelLiters(fuel.reduce((sum, r) => sum + Number(r.liters ?? 0), 0))
-      setFuelCost(fuel.reduce((sum, r) => sum + Number(r.cost ?? 0), 0))
 
-      const deliveries = deliveriesRes.data ?? []
-      setDeliveredLiters(deliveries.reduce((sum, r) => sum + Number(r.liters ?? 0), 0))
-      setDeliveredCost(deliveries.reduce((sum, r) => sum + Number(r.total_cost ?? 0), 0))
-
-      const maintenance = maintenanceRes.data ?? []
-      setMaintenanceCount(maintenance.length)
-      setMaintenanceCost(maintenance.reduce((sum, r) => sum + Number(r.cost ?? 0), 0))
+      const diesel = (dieselTypeRes.data ?? [])[0]
+      if (!diesel) {
+        setHasDiesel(false)
+        setDieselStock(null)
+      } else {
+        setHasDiesel(true)
+        setDieselUnit(diesel.unit)
+        const since = diesel.initial_date
+        const [inRes, outRes] = await Promise.all([
+          supabase
+            .from('fuel_deliveries')
+            .select('liters')
+            .eq('fuel_type_id', diesel.id)
+            .gte('delivered_at', since)
+            .returns<Array<{ liters: number }>>(),
+          supabase
+            .from('fuel_records')
+            .select('liters')
+            .eq('fuel_type_id', diesel.id)
+            .gte('recorded_at', since)
+            .returns<Array<{ liters: number }>>(),
+        ])
+        const totalIn = (inRes.data ?? []).reduce((s, r) => s + Number(r.liters), 0)
+        const totalOut = (outRes.data ?? []).reduce((s, r) => s + Number(r.liters), 0)
+        setDieselStock(Number(diesel.initial_liters) + totalIn - totalOut)
+      }
 
       setLoading(false)
     }
@@ -136,24 +147,16 @@ export function Dashboard() {
       {loading ? (
         <p className="text-slate-500">Carregando...</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card
+            label="Estoque atual de Diesel"
+            value={hasDiesel && dieselStock != null ? `${dieselStock.toFixed(0)} ${dieselUnit}` : '—'}
+            sub={hasDiesel ? 'Saldo em tempo real' : 'Nenhum combustível "Diesel" cadastrado ainda'}
+          />
           <Card
             label="Combustível abastecido"
-            period={periodLabels[period]}
             value={`${fuelLiters.toFixed(0)} L`}
-            sub={`R$ ${fuelCost.toFixed(2)}`}
-          />
-          <Card
-            label="Combustível recebido"
-            period={periodLabels[period]}
-            value={`${deliveredLiters.toFixed(0)} L`}
-            sub={`R$ ${deliveredCost.toFixed(2)}`}
-          />
-          <Card
-            label="Manutenções"
-            period={periodLabels[period]}
-            value={`${maintenanceCount}`}
-            sub={`R$ ${maintenanceCost.toFixed(2)}`}
+            sub={periodLabels[period]}
           />
         </div>
       )}
@@ -163,24 +166,12 @@ export function Dashboard() {
   )
 }
 
-function Card({
-  label,
-  period,
-  value,
-  sub,
-}: {
-  label: string
-  period: string
-  value: string
-  sub: string
-}) {
+function Card({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="bg-white border border-slate-200 rounded-lg px-4 py-4">
       <p className="text-sm text-slate-500">{label}</p>
       <p className="text-2xl font-semibold text-slate-900">{value}</p>
-      <p className="text-xs text-slate-400">
-        {sub} · {period}
-      </p>
+      <p className="text-xs text-slate-400">{sub}</p>
     </div>
   )
 }

@@ -9,6 +9,12 @@ export interface Profile {
   created_at: string
 }
 
+export interface MachineGroup {
+  id: string
+  name: string
+  created_at: string
+}
+
 export interface Machine {
   id: string
   model: string
@@ -17,6 +23,7 @@ export interface Machine {
   current_hourmeter: number
   maintenance_interval_hours: number | null
   status: string
+  group_id: string | null
   created_at: string
 }
 
