@@ -29,6 +29,25 @@ function toInputValue(iso: string) {
   return d.toISOString().slice(0, 16)
 }
 
+type PeriodOption = '7' | '14' | '30' | 'custom'
+
+function daysAgoInput(days: number) {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
+
+function todayInput() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+const periodLabels: Record<PeriodOption, string> = {
+  '7': 'Últimos 7 dias',
+  '14': 'Últimos 14 dias',
+  '30': 'Último mês',
+  custom: 'Período personalizado',
+}
+
 type Movement =
   | ({ kind: 'entrada' } & FuelDelivery)
   | ({ kind: 'saida' } & FuelRecord)
@@ -43,6 +62,9 @@ export function Fuel() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null)
+  const [period, setPeriod] = useState<PeriodOption>('30')
+  const [customFrom, setCustomFrom] = useState(daysAgoInput(30))
+  const [customTo, setCustomTo] = useState(todayInput())
 
   async function load() {
     setLoading(true)
@@ -95,9 +117,16 @@ export function Fuel() {
     load()
   }
 
+  const from = period === 'custom' ? customFrom : daysAgoInput(Number(period))
+  const to = period === 'custom' ? customTo : todayInput()
+  const fromISO = new Date(from + 'T00:00:00').toISOString()
+  const toISO = new Date(to + 'T23:59:59').toISOString()
+  const periodDeliveries = deliveries.filter((d) => d.delivered_at >= fromISO && d.delivered_at <= toISO)
+  const periodRecords = records.filter((r) => r.recorded_at >= fromISO && r.recorded_at <= toISO)
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Combustível</h1>
           <p className="text-sm text-slate-500">Diesel e outros combustíveis do tanque</p>
@@ -108,6 +137,55 @@ export function Fuel() {
         >
           {showNewForm ? 'Cancelar' : 'Novo tipo'}
         </button>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <p className="text-sm font-medium text-slate-900">
+            Movimentações — {periodLabels[period]}
+          </p>
+          <div className="flex items-center gap-2">
+            {(['7', '14', '30', 'custom'] as PeriodOption[]).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setPeriod(opt)}
+                className={`text-sm px-3 py-1.5 rounded-md border ${
+                  period === opt
+                    ? 'bg-brand text-white border-brand'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {opt === 'custom' ? 'Personalizado' : `${opt} dias`}
+              </button>
+            ))}
+          </div>
+        </div>
+        {period === 'custom' && (
+          <div className="flex items-end gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">De</label>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Até</label>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        )}
+        <p className="text-xs text-slate-400">
+          Esse filtro só afeta a lista de movimentações de cada combustível abaixo — o saldo em estoque continua
+          considerando todo o histórico.
+        </p>
       </div>
 
       {showNewForm && (
@@ -183,10 +261,10 @@ export function Fuel() {
                     type={type}
                     machines={machines}
                     movements={[
-                      ...deliveries
+                      ...periodDeliveries
                         .filter((d) => d.fuel_type_id === type.id)
                         .map((d): Movement => ({ kind: 'entrada', ...d })),
-                      ...records
+                      ...periodRecords
                         .filter((r) => r.fuel_type_id === type.id)
                         .map((r): Movement => ({ kind: 'saida', ...r })),
                     ].sort((a, b) => {
@@ -440,12 +518,12 @@ function FuelTypePanel({
       )}
 
       <div>
-        <p className="text-xs font-medium text-slate-500 mb-2">Movimentações recentes</p>
+        <p className="text-xs font-medium text-slate-500 mb-2">Movimentações no período</p>
         {movements.length === 0 ? (
-          <p className="text-sm text-slate-400">Nenhuma movimentação ainda.</p>
+          <p className="text-sm text-slate-400">Nenhuma movimentação no período selecionado.</p>
         ) : (
           <ul className="space-y-1.5">
-            {movements.slice(0, 12).map((m) => {
+            {movements.map((m) => {
               const machine = m.kind === 'saida' ? machines.find((x) => x.id === m.machine_id) : null
               const date = m.kind === 'entrada' ? m.delivered_at : m.recorded_at
               return (

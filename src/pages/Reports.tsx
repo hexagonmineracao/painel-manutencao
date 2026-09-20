@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { exportToCsv } from '../lib/csv'
+import { exportToPdf } from '../lib/pdf'
 import type {
   FuelDelivery,
   FuelRecord,
@@ -244,9 +244,15 @@ export function Reports() {
     return materials.find((m) => m.id === id)?.name ?? '—'
   }
 
+  const periodSubtitle =
+    `Período: ${new Date(from).toLocaleDateString('pt-BR')} a ${new Date(to).toLocaleDateString('pt-BR')}` +
+    (groupFilter ? ` · Grupo: ${groups.find((g) => g.id === groupFilter)?.name ?? ''}` : '')
+
   function exportDeliveries() {
-    exportToCsv(
+    exportToPdf(
       `entradas_combustivel_${from}_a_${to}`,
+      'Entrada de combustível',
+      periodSubtitle,
       ['Tipo', 'Data/hora', 'Litros', 'Valor', 'R$/L', 'Fornecedor', 'Usuário'],
       deliveries.map((d) => [
         fuelTypeName(d.fuel_type_id),
@@ -261,8 +267,10 @@ export function Reports() {
   }
 
   function exportFuelRecords() {
-    exportToCsv(
+    exportToPdf(
       `abastecimentos_${from}_a_${to}`,
+      'Abastecimentos (saída de combustível)',
+      periodSubtitle,
       ['Máquina', 'Combustível', 'Data/hora', 'Horímetro', 'Litros', 'Custo', 'Usuário'],
       visibleFuelRecords.map((r) => [
         machineName(r.machine_id),
@@ -277,8 +285,10 @@ export function Reports() {
   }
 
   function exportMaterialMovements() {
-    exportToCsv(
+    exportToPdf(
       `movimentacoes_estoque_${from}_a_${to}`,
+      'Movimentações de estoque',
+      periodSubtitle,
       ['Material', 'Tipo', 'Data/hora', 'Quantidade', 'Máquina', 'Usuário'],
       visibleMaterialMovements.map((m) => [
         materialName(m.material_id),
@@ -292,8 +302,10 @@ export function Reports() {
   }
 
   function exportMaintenanceRecords() {
-    exportToCsv(
+    exportToPdf(
       `manutencoes_${from}_a_${to}`,
+      'Manutenções',
+      periodSubtitle,
       ['Máquina', 'Tipo', 'Descrição', 'Data/hora', 'Horímetro', 'Custo', 'Usuário'],
       visibleMaintenanceRecords.map((r) => [
         machineName(r.machine_id),
@@ -308,8 +320,10 @@ export function Reports() {
   }
 
   function exportFuelTypes() {
-    exportToCsv(
+    exportToPdf(
       `combustivel_por_tipo_${from}_a_${to}`,
+      'Combustível por tipo',
+      periodSubtitle,
       ['Combustível', 'Entradas', 'Custo entradas', 'Saídas'],
       fuelTypeRows.map((r) => [
         r.fuelType.name,
@@ -321,8 +335,10 @@ export function Reports() {
   }
 
   function exportFuelByMachine() {
-    exportToCsv(
+    exportToPdf(
       `combustivel_por_maquina_${from}_a_${to}`,
+      'Combustível por máquina',
+      periodSubtitle,
       ['Máquina', 'Litros', 'Custo', 'L/h'],
       fuelRows.map((r) => [
         r.machine.name,
@@ -334,16 +350,20 @@ export function Reports() {
   }
 
   function exportMaintenanceByMachine() {
-    exportToCsv(
+    exportToPdf(
       `manutencoes_por_maquina_${from}_a_${to}`,
+      'Manutenções por máquina',
+      periodSubtitle,
       ['Máquina', 'Quantidade', 'Custo'],
       maintenanceRows.map((r) => [r.machine.name, r.count, r.cost.toFixed(2)]),
     )
   }
 
   function exportMaterials() {
-    exportToCsv(
+    exportToPdf(
       `materiais_${from}_a_${to}`,
+      'Materiais',
+      periodSubtitle,
       ['Material', 'Entradas', 'Custo entradas', 'Saídas'],
       materialRows.map((r) => [
         r.material.name,
@@ -405,7 +425,7 @@ export function Reports() {
             <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between gap-3">
               <span>Combustível por tipo</span>
               <button onClick={exportFuelTypes} className="text-xs text-slate-500 underline hover:text-slate-900">
-                Exportar CSV
+                Exportar PDF
               </button>
             </div>
             <div className="overflow-x-auto">
@@ -460,7 +480,7 @@ export function Reports() {
                   {avgPricePerLiter != null && ` · média R$ ${avgPricePerLiter.toFixed(3)}/L`}
                 </span>
                 <button onClick={exportDeliveries} className="text-xs text-slate-500 underline hover:text-slate-900">
-                  Exportar CSV
+                  Exportar PDF
                 </button>
               </div>
             </div>
@@ -508,7 +528,7 @@ export function Reports() {
             <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between gap-3">
               <span>Abastecimentos (saída de combustível)</span>
               <button onClick={exportFuelRecords} className="text-xs text-slate-500 underline hover:text-slate-900">
-                Exportar CSV
+                Exportar PDF
               </button>
             </div>
             <div className="overflow-x-auto">
@@ -560,7 +580,7 @@ export function Reports() {
                   Total: {totalLiters.toFixed(0)} L · R$ {totalFuelCost.toFixed(2)}
                 </span>
                 <button onClick={exportFuelByMachine} className="text-xs text-slate-500 underline hover:text-slate-900">
-                  Exportar CSV
+                  Exportar PDF
                 </button>
               </div>
             </div>
@@ -609,7 +629,7 @@ export function Reports() {
                   onClick={exportMaintenanceByMachine}
                   className="text-xs text-slate-500 underline hover:text-slate-900"
                 >
-                  Exportar CSV
+                  Exportar PDF
                 </button>
               </div>
             </div>
@@ -650,7 +670,7 @@ export function Reports() {
                 onClick={exportMaintenanceRecords}
                 className="text-xs text-slate-500 underline hover:text-slate-900"
               >
-                Exportar CSV
+                Exportar PDF
               </button>
             </div>
             <div className="overflow-x-auto">
@@ -696,7 +716,7 @@ export function Reports() {
             <div className="px-4 py-3 border-b border-slate-200 font-medium text-slate-900 flex items-center justify-between gap-3">
               <span>Materiais (estoque)</span>
               <button onClick={exportMaterials} className="text-xs text-slate-500 underline hover:text-slate-900">
-                Exportar CSV
+                Exportar PDF
               </button>
             </div>
             <div className="overflow-x-auto">
@@ -742,7 +762,7 @@ export function Reports() {
                 onClick={exportMaterialMovements}
                 className="text-xs text-slate-500 underline hover:text-slate-900"
               >
-                Exportar CSV
+                Exportar PDF
               </button>
             </div>
             <div className="overflow-x-auto">
