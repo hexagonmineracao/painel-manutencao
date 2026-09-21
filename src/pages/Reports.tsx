@@ -240,6 +240,11 @@ export function Reports() {
     return machinesList.find((m) => m.id === id)?.name ?? '—'
   }
 
+  function machineModel(id: string | null) {
+    if (!id) return '—'
+    return machinesList.find((m) => m.id === id)?.model ?? '—'
+  }
+
   function materialName(id: string) {
     return materials.find((m) => m.id === id)?.name ?? '—'
   }
@@ -271,9 +276,10 @@ export function Reports() {
       `abastecimentos_${from}_a_${to}`,
       'Abastecimentos (saída de combustível)',
       periodSubtitle,
-      ['Máquina', 'Combustível', 'Data/hora', 'Horímetro', 'Litros', 'Custo', 'Usuário'],
+      ['Máquina', 'Modelo', 'Combustível', 'Data/hora', 'Horímetro', 'Litros', 'Custo', 'Usuário'],
       visibleFuelRecords.map((r) => [
         machineName(r.machine_id),
+        machineModel(r.machine_id),
         fuelTypeName(r.fuel_type_id),
         new Date(r.recorded_at).toLocaleString('pt-BR'),
         r.hourmeter,
@@ -536,6 +542,7 @@ export function Reports() {
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-slate-100">
                     <th className="px-4 py-2 font-medium">Máquina</th>
+                    <th className="px-4 py-2 font-medium">Modelo</th>
                     <th className="px-4 py-2 font-medium">Combustível</th>
                     <th className="px-4 py-2 font-medium">Data/hora</th>
                     <th className="px-4 py-2 font-medium">Horímetro</th>
@@ -547,7 +554,7 @@ export function Reports() {
                 <tbody>
                   {visibleFuelRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-4 text-slate-500">
+                      <td colSpan={8} className="px-4 py-4 text-slate-500">
                         Sem abastecimentos no período.
                       </td>
                     </tr>
@@ -558,6 +565,7 @@ export function Reports() {
                       .map((r) => (
                         <tr key={r.id} className="border-b border-slate-50 last:border-0">
                           <td className="px-4 py-2 text-slate-900">{machineName(r.machine_id)}</td>
+                          <td className="px-4 py-2 text-slate-500">{machineModel(r.machine_id)}</td>
                           <td className="px-4 py-2">{fuelTypeName(r.fuel_type_id)}</td>
                           <td className="px-4 py-2">{new Date(r.recorded_at).toLocaleString('pt-BR')}</td>
                           <td className="px-4 py-2">{r.hourmeter} h</td>

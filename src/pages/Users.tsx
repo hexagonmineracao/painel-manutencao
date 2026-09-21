@@ -1,12 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import type { Profile, Role } from '../lib/database.types'
 
 export function Users() {
+  const { profile: currentProfile } = useAuth()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [resettingId, setResettingId] = useState<string | null>(null)
+  const [savingRoleId, setSavingRoleId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -18,6 +23,36 @@ export function Users() {
   useEffect(() => {
     load()
   }, [])
+
+  async function handleRoleChange(p: Profile, role: Role) {
+    setError(null)
+    setSavingRoleId(p.id)
+    const { error } = await supabase.from('profiles').update({ role }).eq('id', p.id)
+    setSavingRoleId(null)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    load()
+  }
+
+  async function handleDelete(p: Profile) {
+    const confirmed = window.confirm(
+      `Excluir o usuário "${p.full_name}" (@${p.username})? Essa ação não pode ser desfeita.`,
+    )
+    if (!confirmed) return
+    setError(null)
+    setDeletingId(p.id)
+    const { error } = await supabase.functions.invoke('delete-user', {
+      body: { user_id: p.id },
+    })
+    setDeletingId(null)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    load()
+  }
 
   return (
     <div className="space-y-6">
@@ -40,32 +75,53 @@ export function Users() {
         />
       )}
 
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
       {loading ? (
         <p className="text-slate-500">Carregando...</p>
       ) : (
         <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-          {profiles.map((p) => (
-            <div key={p.id}>
-              <div className="px-4 py-3 flex items-center justify-between text-sm">
-                <div>
-                  <span className="text-slate-900">{p.full_name}</span>
-                  <span className="text-slate-400 ml-2">@{p.username}</span>
+          {profiles.map((p) => {
+            const isSelf = p.id === currentProfile?.id
+            return (
+              <div key={p.id}>
+                <div className="px-4 py-3 flex items-center justify-between text-sm flex-wrap gap-2">
+                  <div>
+                    <span className="text-slate-900">{p.full_name}</span>
+                    <span className="text-slate-400 ml-2">@{p.username}</span>
+                    {isSelf && <span className="text-slate-400 ml-2">(você)</span>}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <select
+                      value={p.role}
+                      disabled={isSelf || savingRoleId === p.id}
+                      onChange={(e) => handleRoleChange(p, e.target.value as Role)}
+                      className="rounded-md border border-slate-300 px-2 py-1 text-sm capitalize disabled:opacity-50"
+                    >
+                      <option value="colaborador">Colaborador</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button
+                      onClick={() => setResettingId(resettingId === p.id ? null : p.id)}
+                      className="text-slate-500 hover:text-slate-900 text-xs underline"
+                    >
+                      Redefinir senha
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p)}
+                      disabled={isSelf || deletingId === p.id}
+                      className="text-red-600 hover:text-red-800 text-xs underline disabled:opacity-50 disabled:no-underline"
+                    >
+                      {deletingId === p.id ? 'Excluindo...' : 'Excluir'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-slate-500 capitalize">{p.role}</span>
-                  <button
-                    onClick={() => setResettingId(resettingId === p.id ? null : p.id)}
-                    className="text-slate-500 hover:text-slate-900 text-xs underline"
-                  >
-                    Redefinir senha
-                  </button>
-                </div>
+                {resettingId === p.id && (
+                  <ResetPasswordForm userId={p.id} onDone={() => setResettingId(null)} />
+                )}
               </div>
-              {resettingId === p.id && (
-                <ResetPasswordForm userId={p.id} onDone={() => setResettingId(null)} />
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
